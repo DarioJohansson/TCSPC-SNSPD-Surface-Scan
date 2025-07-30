@@ -28,7 +28,7 @@ Funzioni dell'oggetto "CrioGeneratore":
 # To interact with a RESTful API server in Python, you typically use the 'requests' library.
 # Install it with: pip install requests
 
-import requests # type: ignore
+import requests
 import json
 from time import sleep
 
