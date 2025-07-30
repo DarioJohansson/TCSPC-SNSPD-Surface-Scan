@@ -1,0 +1,20 @@
+[project]
+name = "idq_tc1000"
+version = "0.0.1"
+authors = [
+  { name="Dario Johansson", email="dario.johansson@outlook.com" },
+]
+description = "Package with modules for basic sampling tasks using the IDQuantique TC1000"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+
+[project.urls]
+Homepage = "https://github.com/dariojohansson/qdot-surface-scan"
+
+
