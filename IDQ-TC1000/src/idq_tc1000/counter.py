@@ -40,6 +40,28 @@ In Python, gli oggetti possono memorizzare variabili uniche, che sono utili per 
 Questo oggetto verrà usato per fare una mappa d’intensità sul campione, dato che l’operazione è rapidissima e non richiede particolare precisione.
 '''
 
+class CountData:
+    def __init__(self, count: int = None, integration_time_ms: int = None, input: str = None):
+        
+        if count != None and type(count) == int:
+            self.count = count
+        else:
+            raise ValueError("Count Class: count needs to be of integer type and needs to be specified.")
+        
+        if integration_time_ms:
+            self.integration_time_ms = integration_time_ms
+        
+        if input:
+            self.input = input
+        
+        self.time_created = time.time()
+
+        iobuiobb
+        '''
+        ADD LOCAL VARIABLE STORAGE OF DEVICE SETTINGS IN TCCOUNTER CLASS SO THAT IT CAN BE EXPORTED WITH NO COMM OVERHEAD FOR EACH MEASUREMENT STEP
+        '''
+
+
 class TCCounter:
     def __init__(self, tc, int_time_ms: int = 1000, input: int|str = 'start', mode: str = "cycle", verbose: bool = False):
         self.tc = tc
@@ -118,6 +140,7 @@ class TCCounter:
     def count(self) -> int|None:
         try:
             value = int(zmq_exec(self.tc, f'{self.input}:COUN?'))
+            data = CountData(value, self.int)
             return value
         except ValueError as e:
             print(f"Counter is throwing errors: {e}")
