@@ -81,6 +81,8 @@ class TCCounter:
         if self.verbose:
             print(f"Integration Time Response: {int_time_response}\nCounter Mode Response: {mode_response}")
 
+        self.integration_time_ms = zmq_exec(self.tc, f"{self.input}:COUN:INTE?")
+
     def enabled(self) -> bool:
         if zmq_exec(self.tc, f"{self.input}:ENAB?") == 'ON':
             return True
