@@ -1,6 +1,7 @@
-from flask import Blueprint, request, jsonify
-from devices.idq_tc1000_photon_counter import *
-from devices.idq_tc1000_photon_tol import *
+from quart import Blueprint, jsonify
+import asyncio
+from devices.idq_tc1000_counter import *
+from devices.idq_tc1000_tol import *
 
 
 idq_bp = Blueprint('idq_bp', __name__)

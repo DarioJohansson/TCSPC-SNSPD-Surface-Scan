@@ -4,33 +4,11 @@ Dario Johansson - Tesi in Automazione e Interconnessione di dispositivi volti al
 Questo modulo è incentrato sulla dichiarazione delle variabili funzionali e la definizione degli oggetti utilizzati per connettersi
 e prendere il controllo del CrioGeneratore Monana CryoAdvance-50.
 
-Gli obbiettivi del codice:
-- Fornire oggetti per il controllo unificato del crio responsabile di connettere e operare sulle periferiche dello 
-strumento.
-
-Funzioni dell'oggetto "Posizionatore":
-- Accettare Step Size, Step Vel come parametri di inizializzazione
-- Fornire funzioni per muovere il nanoposizionatore "Rookie" in tre dimensioni
-- Ricevere aggiornamenti sulla posizione dei motori piezo
-- Impostare velocità di movimento
-
-Funzioni dell'oggetto "Raffreddatore":
-- Fornire funzioni per modificare la temperatura dell'ambiente criogenico
-- Fornire funzionni per ricevere informazioni sulla temperatura
-
-
-Funzioni dell'oggetto "CrioGeneratore":
-- Inizializzare la console di controllo principale e i suoi indirizzi.
-- Funzioni per Restituire statistiche generali sullo stato del sistema.
-- Interfaccia modulare per insrerire oggetti di periferica (descritti a priori)
 
 '''
-# To interact with a RESTful API server in Python, you typically use the 'requests' library.
-# Install it with: pip install requests
 
 import requests
 import json
-from time import sleep
 
 
 def string_or_json(data, string: bool):
@@ -44,6 +22,10 @@ def string_or_json(data, string: bool):
 class CryoController:
 
     def __init__(controller, IPaddress):
+        
+        if not IPaddress or type(IPaddress) is not str:
+            raise ValueError("CryoController.__init__(): IP address must be provided")
+            
         controller.IPaddress = IPaddress
         controller.base_url = f"http://{IPaddress}:47101/v1"
         controller.url = f"http://{IPaddress}:47101/v1/controller"
@@ -78,7 +60,7 @@ class CryoController:
     
 ############################################## vacuum system functions #################################################
 
-    def get_target_pressure(controller, string: bool = False):
+    def get_target_pressure(controller):
         response = requests.get(f"{controller.url}/properties/pullVacuumTargetPressure")
         response_json = response.json()
         
@@ -147,7 +129,12 @@ class Positioner:
         response_json = response.json()
         return response_json["deviceConnected"]
     
-
+    def get_position(self, axis: str = "") -> float:
+        if not axis or axis not in ['X', 'Y', 'Z']:
+            raise ValueError("Correct axis must be specified: 'X', 'Y', or 'Z'")
+        
+        response_json = self.status(axis)
+    
     def get_velocity(self, axis: str = '') -> list:
         if not axis or axis not in ['X', 'Y', 'Z']:
             raise ValueError("Correct axis must be specified: 'X', 'Y', or 'Z'")
