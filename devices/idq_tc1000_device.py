@@ -104,7 +104,7 @@ class TimeController:
             raise ValueError(f"TCToL.set_bcount(): invalid bin count supplied: {delay}")
     '''
             
-    def threshold(self, input: int|str, threshold: int|float = None) -> str:
+    def threshold(self, input: int|str, threshold: int|float = None) -> str|bool:
         if type(threshold) not in [float, int] and threshold != None:
             raise ValueError("TimeController.set_threshold(): invalid threshold type supplied.")
         elif threshold == None:
@@ -128,15 +128,7 @@ class TimeController:
             return True
         
         return False
-    
-    def reset(self, input: str|int):
-        input = self.__input_channel_parser(input)        
-        response = zmq_exec(self.connection, f"{input}:COUN:RESE")
-        if response.upper().strip() == 'COUNTER VALUE SET TO 0':
-            return True
-        
-        return False
-            
+                
 
     def enable_input(self, input: str|int) -> bool:
         input = self.__input_channel_parser(input)

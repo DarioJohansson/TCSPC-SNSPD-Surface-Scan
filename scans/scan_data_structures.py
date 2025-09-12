@@ -5,7 +5,8 @@ import json
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 import time
-from devices import idq_tc1000_counter, idq_tc1000_tol
+from devices.idq_tc1000_counter import * 
+from devices.idq_tc1000_tol import *
 
 
 class ScanParameters:
@@ -53,7 +54,7 @@ class ScanParameters:
             self.filename = filename
 
     def __validate_position(self, position: tuple) -> tuple:
-        if len(coords) != len(self.active_axes):
+        if len(position) != len(self.active_axes):
             raise ValueError("ScanParameters.__validate_position(): coordinate dimension given is different from step matrix dimension.")
         return position
 
@@ -72,10 +73,10 @@ class ScanParameters:
                 
         for axis in self.active_axes:
             for i in range(0, self.resolution[axis]):
-                self.step_matrix[axis].append(i * self.step_size[axis])
+                self.step_matrix[axis].append(round(i * self.step_size[axis], 9))
 
     
-    def save_data(self, path: str):        # function to load params from file            
+    def save(self, path: str):        # function to load params from file            
         try:
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(self.__dict__, f, indent=4)
@@ -83,12 +84,11 @@ class ScanParameters:
             return True
         except Exception as e:
             # optional: print to stderr for debugging
-            import sys
             print(f"Error saving ScanParameters to {path}: {e}", file=sys.stderr)
             return False
 
     @classmethod
-    def load_data(cls, path: str):
+    def load(cls, path: str):
         try:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -100,38 +100,91 @@ class ScanParameters:
 
 
 class ScanResults:
-    def __init__(self, resolution: tuple):
+    def __init__(self, resolution: dict = {"X": 0, "Y": 0, "Z": 0}):
     
-        self.resolution = resolution
-        self.data_matrix = np.empty(self.resolution, dtype=object)
+        if resolution != {"X": 0, "Y": 0, "Z": 0}:
+            self.resolution = resolution
+        else:
+            raise ValueError("ScanResults.__init__(): wrong resolution argument passed.")
+        
+        self.active_axes = tuple(axis for axis, size in self.resolution.items() if size > 0)
+        self.data_dims = tuple(size for size in self.resolution.values() if size > 0)
+        self.data_matrix = np.empty(self.data_dims, dtype=object)
 
         self.filename = None
 
     def input_data(self, position: tuple, value: list) -> bool:
-        
-        try:
-            self.data_matrix[position] = value
-            return True
-
-        except Exception as e:
-            if self.error_silent:
-                return False
-            else:
-                raise Exception(e)
+        self.data_matrix[position] = value
 
 
-    def get_data(self, position: tuple):   
+    def get_data(self, position: tuple) -> list:   
         try:
             return self.data_matrix[position]
 
         except Exception as e:
             print(f"ScanParameters.get_data(): encountered error -> {e}")
 
-    def save(self):
-        pass
+    def save(self, path:str) -> bool:
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                shape = tuple(self.resolution[ax] for ax in self.active_axes)
+                serialized_data = []
+                for idx in np.ndindex(shape):
+                    obj_list = self.data_matrix[idx]
+                    data_dict = {}
+                    for obj in obj_list:
+                        data_dict.update(obj.out())
 
-    def load(self):
-        pass
+                    entry={
+                        "position": idx,
+                        "values": data_dict
+                    }
+                    
+                    serialized_data.append(entry)
+
+                json.dump({
+                    "resolution": self.resolution,
+                    "data": serialized_data
+                }, f, indent=2)                   
+                
+            self.filename = path
+            return True
+        except Exception as e:
+            # optional: print to stderr for debugging
+            print(f"Error saving ScanParameters to {path}: {e}", file=sys.stderr)
+            return False
+
+    @staticmethod
+    def load(path:str):
+        if not path:
+            raise ValueError("ScanResults.load(): path must be given to load from file.")
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                json_data = json.load(f)
+
+            # Restore axes and resolution
+            resolution = json_data["resolution"]
+            obj = ScanResults(resolution)
+            # Fill data_matrix with object lists
+            for data_dict in json_data["data"]:
+                counter_obj = CountData.input(data_dict["values"])
+                tol_obj =  ToLData.input(data_dict["values"])
+
+                obj_list = []
+                if counter_obj:
+                    obj_list.append(counter_obj)
+                if tol_obj:
+                    obj_list.append(tol_obj)
+                
+                pos = tuple(data_dict["position"])
+                obj.input_data(pos, obj_list)
+                
+            return obj
+
+        except Exception as e:
+            import sys
+            print(f"Error loading ScanResults from {path}: {e}", file=sys.stderr)
+            return False
 
 class Graph2D:
     def __init__(self):
@@ -143,7 +196,6 @@ class Graph2D:
         self.yaxis_majorlocator = 1
         self.grid = {"visible": True, "linestyle": "--", "alpha": 1}
         self.file = {"name": "graph.png", "dpi": 500}
-        self.special = ""
 
     def apply_settings(self):
         self.ax.set_title(self.title["name"], fontsize=self.title["fontsize"], fontweight=self.title["fontweight"])

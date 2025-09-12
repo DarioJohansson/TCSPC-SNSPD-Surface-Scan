@@ -133,7 +133,8 @@ class Positioner:
         if not axis or axis not in ['X', 'Y', 'Z']:
             raise ValueError("Correct axis must be specified: 'X', 'Y', or 'Z'")
         
-        response_json = self.status(axis)
+        response_json = self.status(axis)       ## not ready yet
+        return response_json["theoreticalPosition"]
     
     def get_velocity(self, axis: str = '') -> list:
         if not axis or axis not in ['X', 'Y', 'Z']:

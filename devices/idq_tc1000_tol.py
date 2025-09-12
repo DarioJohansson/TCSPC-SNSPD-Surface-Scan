@@ -7,7 +7,7 @@ import ast
 
 
 class ToLData:
-    def __init__(self, histogram: tuple[list, list] = None):
+    def __init__(self, histogram: tuple[list, list] = None, time_created: float = None):
         
         if histogram != None or len(histogram[0]) == len(histogram[1]):
             self.x_data = histogram[0]
@@ -15,8 +15,26 @@ class ToLData:
         else:
             raise ValueError("ToL Class: histogram needs to be specified and needs to be a tuple of two identical lenght lists (X and Y values)")
         
-        self.time_created = time.time()
+        if not time_created:
+            self.time_created = time.time()
+        else:
+            self.time_created = time_created
 
+    def out(self) -> dict:
+        data = {"tol-x": self.x_data, "tol-y": self.y_data, "tol-timestamp": self.time_created}
+        return data
+
+    @staticmethod 
+    def input(data: dict) -> bool:
+        try:
+            if data.get("tol-x") and data.get("tol-y") and data.get("tol-timestamp"):
+                obj = ToLData(histogram=tuple(data.get("tol-x"), data.get("tol-y")), time_created=data.get("tol-timestamp"))
+                return obj
+            else:
+                return None
+        except:
+            print("TOL object failed to load.")
+            return None
 
 class TCToL:
     def __init__(self, 

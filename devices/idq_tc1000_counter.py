@@ -42,29 +42,40 @@ Questo oggetto verrà usato per fare una mappa d’intensità sul campione, dato
 '''
 
 class CountData:
-    def __init__(self, count: int = None, integration_time_ms: int = None):
+    def __init__(self, count: int = None, integration_time_s: int = None, time_created: float = None):
         
         if count != None and type(count) == int:
             self.count = count
         else:
             raise ValueError("Count Class: count needs to be of integer type and needs to be specified.")
         
-        if integration_time_ms and type(integration_time_ms) == int:
-            self.integration_time_s = integration_time_ms * 1e-3
+        if integration_time_s:
+            self.integration_time_s = integration_time_s
         
-        
-        self.time_created = time.time()
-    
+        if not time_created:
+            self.time_created = time.time()
+        else:
+            self.time_created = time_created
+
     def frequency(self):
         return self.count/self.integration_time_s
     
-    # implement schema function here, whereby each object composes a bit of a csv format for example, outputs the correct data
-    # via the function which will be foreshadowingly be processed in a loop by an outside logic
+    def out(self) -> dict:
+        data={"count": self.count, "integration-time-s": self.integration_time_s, "counter-timestamp": self.time_created}
+        return data
 
+    @staticmethod 
+    def input(data: dict) -> bool:
+        try:
+            if data.get("count") and data.get("integration-time-s") and data.get("counter-timestamp"):
+                obj = CountData(count=data.get("count"), integration_time_s=data.get("integration-time-s"), time_created=data.get("counter-timestamp"))
+                return obj
+            else:
+                return None
+        except:
+            print("Counter object failed to load.")
+            return None
        
-
-
-
 class TCCounter:
     def __init__(
                 self, 
@@ -124,10 +135,18 @@ class TCCounter:
         return False
 
 
+    def reset(self, input: str|int):
+        input = self.__input_channel_parser(input)        
+        response = zmq_exec(self.tc, f"{input}:COUN:RESE")
+        if response.upper().strip() == 'COUNTER VALUE SET TO 0':
+            return True
+        
+        return False
+    
     def count(self) -> int|None:
         try:
             value = int(zmq_exec(self.tc, f'{self.input}:COUN?'))
-            data = CountData(value, self.integration_time_ms)
+            data = CountData(value, self.integration_time_ms * 1e-3)
             return data
         except ValueError as e:
             print(f"Counter is throwing errors: {e}")

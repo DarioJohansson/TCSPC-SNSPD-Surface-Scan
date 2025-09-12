@@ -15,7 +15,7 @@ First iteration of scan on a sample. This scan's structure must be something of 
 from devices.idq_tc1000_counter import *
 from devices.idq_tc1000_device import *
 from devices.montana_cryoadvance_controls import *
-from scans import scan_data_structures
+from scans.scan_data_structures import *
 from utils.common import connect
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
@@ -37,6 +37,9 @@ try:
     timecontroller = TimeController(tc)
     start_counter = TCCounter(tc, "start")
     input1_counter = TCCounter(tc, 1)
+    if not timecontroller.threshold(1, -0.1):
+        print("could not set threshold")
+        exit()
 
     for i in ["start", 1]:
         timecontroller.enable_input(i)
@@ -56,24 +59,20 @@ except Exception as e:
 # Operational Parameters:
 
 scan_set = ScanParameters()
-
-scan_set.step_size["Z"]=10e-6   # metres
+axis='Z'
+scan_set.step_size["Z"]=0.000005   # metres
 scan_set.step_velocity=50 * 1e-6    # meters/sec  ##IMPLEMENT THIS IN THE POSITIONER CLASS. doing it manually from screen
-scan_set.resolution["Z"]=250
-scan_set.polling_frequency=100 #HZ to update positioner status
+scan_set.resolution["Z"]=200
+scan_set.create_step_sequence()
 
-# Mechanisms:
 
 #Preparation of Data Structures 
 
-Y_DATA = []
-X_DATA = []
+scan_res = ScanResults({"X": 0, "Y": 0, "Z": scan_set.resolution["Z"]})
 
-for i in range(0, step_count):
-    Y_DATA.append(0)
-    X_DATA.append(0)
+############################## SCAN ROUTINE DEFINITION ###############################
 
-def scan_routine(step_index, step_list, x_data_list, y_data_list, counter, positioner, axis):
+def scan_routine(position, scan_settings, results, counter, positioner, axis):
 
     def wait_end_motion():
         start=time.time()
@@ -81,27 +80,34 @@ def scan_routine(step_index, step_list, x_data_list, y_data_list, counter, posit
         while True:
             if positioner.status(axis)["moving"] == False:
                 break
-            time.sleep(1/polling_frequency)
+            time.sleep(1/scan_settings.polling_frequency)
         
         end=time.time()
         print(f"Waited for motion {(end-start)*1000} mS")
         return
 
-    print(f"Step: {step_index}")    
+    print(f"Step: {position[axis]}")    
     
-    actual_position=positioner.status(axis)["theoreticalPosition"]
+    actual_position=round(positioner.status(axis)["theoreticalPosition"], 9)
+    try_count=1
+    
+    while scan_settings.step_matrix[axis][position[axis]] != actual_position:
+        positioner.move_to_position(axis, scan_settings.step_matrix[axis][position[axis]])
+        wait_end_motion()
+        time.sleep(0.5) # safety sleep
+        actual_position=round(positioner.status(axis)["theoreticalPosition"], 9)
+        print(f"Try: {try_count}\nTheoretical Position: {scan_settings.step_matrix[axis][position[axis]]}\nActual reported position: {actual_position}")
+        try_count+=1
 
-    x_data_list[step_index] = actual_position       ## Record X step with feedback from positioner.
-
-    y_data_list[step_index] = counter.count().frequency() # Record Y value from counter frequency
-
-    positioner.move_to_position(axis, step_list[step_index])
-
-    wait_end_motion()
-
-    time.sleep(0.2)
+    pos = tuple(value for value in position.values())
+    results.input_data(pos, [counter.count()])                 # Record Y value from counter frequency
 
 
+
+
+    time.sleep(scan_settings.sleep_time)
+
+########################################################################################
 
 
 
@@ -122,32 +128,42 @@ signal.signal(signal.SIGTERM, exit)  # kill <pid>
 
 # Main logic:
 try:
+
     print("Tutto pronto. Premi invio...")
     input()
 
     start_time = time.time()
     positioner.zero_position(axis)
 
-    for step_index in range(0, step_count):
+    for step_index in range(0, scan_set.resolution["Z"]):
         
-        scan_routine(step_index, STEPS, X_DATA, Y_DATA, input1_counter, positioner, axis)
+        position = {"Z": step_index}
+        scan_routine(position, scan_set, scan_res, input1_counter, positioner, "Z")
 
     end_time=time.time()
     print(f"Time Elapsed for Scan: {end_time-start_time} S")
 
-    X_DATA=[round(p * 1e6, 2) for p in X_DATA]
+    X_DATA = [x * 1e6 for x in scan_set.step_matrix["Z"]]
+    Y_DATA = []
+
+    for i in range(0, scan_set.resolution["Z"]):
+        pos = (i,)
+        frequency = scan_res.get_data(pos)[0].frequency()
+        Y_DATA.append(frequency)
 
     fig, ax = plt.subplots()
     ax.plot(X_DATA, Y_DATA)
-    ax.set_title("1D Scan - 200 x 1 Micrometer Steps", fontsize=14, fontweight="bold")
+    ax.set_title("1D Scan - 200 x 5 Micrometer Steps", fontsize=14, fontweight="bold")
     ax.set_xlabel("Position (microM)", fontsize=10)
     ax.set_ylabel("Photon incidence frequency (Hz)", fontsize=9)
-    ax.xaxis.set_major_locator(MultipleLocator(200))
-    ax.yaxis.set_major_locator(MultipleLocator(100))
+    ax.xaxis.set_major_locator(MultipleLocator(100))
+    ax.yaxis.set_major_locator(MultipleLocator(300))
     ax.grid(True, linestyle="--", alpha=0.6)
     
-    plt.savefig("graph.png", dpi=500)
+    plt.savefig("1D-sweep-100microns-sec-2.png", dpi=500)
 
+    scan_res.save("/home/dario/Temp/scan-dump.json")
+    scan_set.save("/home/dario/Temp/scan-settings.json")
 
     print("Premi invio per uscire...")
     input()
@@ -155,10 +171,3 @@ try:
 except Exception as e:
     print(e)
     exit()
-
-
-
-
-
-
-
