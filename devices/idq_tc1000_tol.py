@@ -7,11 +7,11 @@ import ast
 
 
 class ToLData:
-    def __init__(self, histogram: tuple[list, list] = None, time_created: float = None):
+    def __init__(self, x_data: list = None, y_data: list = None, time_created: float = None):
         
-        if histogram != None or len(histogram[0]) == len(histogram[1]):
-            self.x_data = histogram[0]
-            self.y_data = histogram[1]
+        if x_data != None and y_data != None and len(x_data) == len(y_data):
+            self.x_data = x_data
+            self.y_data = y_data
         else:
             raise ValueError("ToL Class: histogram needs to be specified and needs to be a tuple of two identical lenght lists (X and Y values)")
         
@@ -28,7 +28,7 @@ class ToLData:
     def input(data: dict) -> bool:
         try:
             if data.get("tol-x") and data.get("tol-y") and data.get("tol-timestamp"):
-                obj = ToLData(histogram=tuple(data.get("tol-x"), data.get("tol-y")), time_created=data.get("tol-timestamp"))
+                obj = ToLData(x_data=data.get("tol-x"), y_data=data.get("tol-y"), time_created=data.get("tol-timestamp"))
                 return obj
             else:
                 return None
@@ -113,6 +113,5 @@ class TCToL:
         # Get histogram data
         Y_data = ast.literal_eval(zmq_exec(self.connection, f"HIST{self.input}:DATA?"))
         X_data = [i * self.bwidth for i in range(self.bcount)]
-        tupl = (X_data, Y_data)
-        data_object = ToLData(tupl)
+        data_object = ToLData(x_data=X_data, y_data=Y_data)
         return data_object

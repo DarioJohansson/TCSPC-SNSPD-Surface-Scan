@@ -9,6 +9,7 @@ e prendere il controllo del CrioGeneratore Monana CryoAdvance-50.
 
 import requests
 import json
+import time
 
 
 def string_or_json(data, string: bool):
@@ -116,9 +117,15 @@ class Positioner:
         self.axis_url = {'X': f"{self.axes_base_url}/axis2", 'Y': f"{self.axes_base_url}/axis1", 'Z': f"{self.axes_base_url}/axis3"}
         self.velocity = {'X': step_vel, 'Y': step_vel, 'Z': step_vel}
 
+    @staticmethod
+    def __validate_axis(axis):
+        if axis not in ['X', 'Y', 'Z']:
+            raise ValueError("Axis must be 'X', 'Y', or 'Z'")
+        return axis
+
+
     def status(self, axis: str = '') -> dict:
-        if not axis or axis not in ['X', 'Y', 'Z']:
-            raise ValueError("Correct axis must be specified: 'X', 'Y', or 'Z'")
+        axis = self.__validate_axis(axis)
         
         response = requests.get(f"{self.axis_url[axis]}/properties/status")
         response_json = response.json()
@@ -130,15 +137,12 @@ class Positioner:
         return response_json["deviceConnected"]
     
     def get_position(self, axis: str = "") -> float:
-        if not axis or axis not in ['X', 'Y', 'Z']:
-            raise ValueError("Correct axis must be specified: 'X', 'Y', or 'Z'")
+        axis = self.__validate_axis(axis)
         
-        response_json = self.status(axis)       ## not ready yet
-        return response_json["theoreticalPosition"]
+        return round(self.status(axis)["theoreticalPosition"], 9)
     
     def get_velocity(self, axis: str = '') -> list:
-        if not axis or axis not in ['X', 'Y', 'Z']:
-            raise ValueError("Correct axis must be specified: 'X', 'Y', or 'Z'")
+        axis = self.__validate_axis(axis)
         
         response = requests.get(f"{self.axis_url[axis]}/properties/velocity")
         response_json = response.json()
@@ -146,16 +150,15 @@ class Positioner:
 
 
     def stop(self, axis: str = '') -> bool:
-        if not axis or axis not in ['X', 'Y', 'Z']:
-            raise ValueError("Correct axis must be specified: 'X', 'Y', or 'Z'")
+        axis = self.__validate_axis(axis)
         
         response = requests.post(f"{self.axis_url[axis]}/methods/stop()")
         return response.status_code == 200
     
     
     def move_to_position(self, axis: str = '', position: int|float = None) -> bool:
-        if axis not in ['X', 'Y', 'Z']:
-            raise ValueError("Axis must be 'X', 'Y', or 'Z'")
+        axis = self.__validate_axis(axis)
+
         if not isinstance(position, (int, float)):
             raise ValueError("Position must be a numeric value")
         # Assuming we have a method to set the position on the device
@@ -166,15 +169,14 @@ class Positioner:
         return response.status_code == 200
 
     def zero_position(self, axis: str = '') -> bool:
-        if axis not in ['X', 'Y', 'Z']:
-            raise ValueError("Axis must be 'X', 'Y', or 'Z'")
-        
+        axis = self.__validate_axis(axis)
+
         response = requests.post(f"{self.axis_url[axis]}/methods/zero()")
         return response.status_code == 200
 
     def move_to_limit(self, axis: str = '', direction: str = 'positive') -> bool:
-        if axis not in ['X', 'Y', 'Z']:
-            raise ValueError("Axis must be 'X', 'Y', or 'Z'")
+        axis = self.__validate_axis(axis)
+
         if direction not in ['positive', 'negative']:
             raise ValueError("Direction must be 'positive' or 'negative'")
         
@@ -183,9 +185,20 @@ class Positioner:
         return response.status_code == 200
 
     def set_velocity(self, axis: str = '', velocity: int|float = None) -> bool:
-        if axis not in ['X', 'Y', 'Z']:
-            raise ValueError("Axis must be 'X', 'Y', or 'Z'")
+        axis = self.__validate_axis(axis)
+
         if not isinstance(velocity, (int, float)):
             raise ValueError("Position must be a numeric value")
         pass                
         # Set velocity on the device
+
+    def wait_end_motion(self, axis: str = '', polling_frequency = 100):
+
+        start=time.time()
+        
+        while self.status(axis)["moving"]:
+            time.sleep(1/polling_frequency)
+
+        end=time.time()
+
+        return {round(end-start, 6)}

@@ -118,9 +118,11 @@ class TCCounter:
             raise ValueError("TCCounter.set_integration_time(): no integration time specified.")
 
         int_time_response = zmq_exec(self.tc, f"{self.input}:COUN:INTE {int_time_ms}")
+        
         if int_time_response.strip() == f'Value set to {int_time_ms}':
             self.integration_time_ms = int_time_ms
             return True
+        
         return False
         
    
@@ -145,6 +147,7 @@ class TCCounter:
     
     def count(self) -> int|None:
         try:
+            time.sleep(self.integration_time_ms*1e-3)               # Forcing sleep time (converted to seconds) here to avoid having to do it elsewhere. 
             value = int(zmq_exec(self.tc, f'{self.input}:COUN?'))
             data = CountData(value, self.integration_time_ms * 1e-3)
             return data

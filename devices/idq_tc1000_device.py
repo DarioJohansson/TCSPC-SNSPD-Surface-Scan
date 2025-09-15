@@ -1,15 +1,16 @@
-from utils.common import zmq_exec
+from utils.common import zmq_exec, connect
 import zmq
 from collections import defaultdict
 from devices.idq_tc1000_counter import *
 from devices.idq_tc1000_tol import *
 
 class TimeController:
-    def __init__(self, tc = None, verbose: bool = False):
-        if tc == None or type(tc) != zmq.sugar.socket.Socket:
+    def __init__(self, machine_ip = None, verbose: bool = False):
+        if machine_ip == None or type(machine_ip) != str:
             raise ValueError("TimeController: need to provide me with a valid zmq connection context object.")
+        
         self.verbose = verbose
-        self.connection = tc
+        self.connection = connect(machine_ip)
         self.devices = []
         self.status = {}
 
@@ -107,6 +108,7 @@ class TimeController:
     def threshold(self, input: int|str, threshold: int|float = None) -> str|bool:
         if type(threshold) not in [float, int] and threshold != None:
             raise ValueError("TimeController.set_threshold(): invalid threshold type supplied.")
+        
         elif threshold == None:
             input = self.__input_channel_parser(input)
             response = zmq_exec(self.connection, f"{input}:THRE?")
@@ -136,7 +138,7 @@ class TimeController:
             return True
         else:
             response = zmq_exec(self.connection, f"{input}:ENAB")
-            if response.strip() == 'Value set to ON':
+            if response.strip().upper() == 'VALUE SET TO ON':
                 return True
             else:
                 if self.verbose:
