@@ -1,6 +1,4 @@
 from utils.common import zmq_exec, connect
-import zmq
-from collections import defaultdict
 from devices.idq_tc1000_counter import *
 from devices.idq_tc1000_tol import *
 
@@ -79,15 +77,15 @@ class TimeController:
         return False
     
     @staticmethod
-    def __input_channel_parser(input):
+    def _input_channel_parser(input):
         if not input or (type(input) != int and type(input) != str):
-            raise ValueError("TimeController.__input_channel_parser(): invalid input type supplied.")
+            raise ValueError("TimeController._input_channel_parser(): invalid input type supplied.")
         elif type(input) == int and input not in range(1,5):
-            raise ValueError(f"TimeController.__input_channel_parser(): input channel \"{input}\" outside of bounds.")
+            raise ValueError(f"TimeController._input_channel_parser(): input channel \"{input}\" outside of bounds.")
         elif type(input) == str and input.upper() == "START":
             return "STAR"
         elif type(input) == str and input.upper() != "START":
-            raise ValueError(f"TimeController.__input_channel_parser(): \"{input}\" is not a valid input channel.")
+            raise ValueError(f"TimeController._input_channel_parser(): \"{input}\" is not a valid input channel.")
         else:
             return f"INPU{input}"
         
@@ -110,7 +108,7 @@ class TimeController:
             raise ValueError("TimeController.set_threshold(): invalid threshold type supplied.")
         
         elif threshold == None:
-            input = self.__input_channel_parser(input)
+            input = self._input_channel_parser(input)
             response = zmq_exec(self.connection, f"{input}:THRE?")
             try:
                 response = float(response.replace("V", ""))
@@ -118,14 +116,14 @@ class TimeController:
             except Exception:
                 return None
         else:
-            input = self.__input_channel_parser(input)
+            input = self._input_channel_parser(input)
             response = zmq_exec(self.connection, f"{input}:THRE {threshold}")
             if "VALUE SET TO" in response.upper():
                 return True
             else:
                 return False
             
-    def __enabled(self, input: str|int) -> bool:
+    def _enabled(self, input: str|int) -> bool:
         if zmq_exec(self.connection, f"{input}:ENAB?") == 'ON':
             return True
         
@@ -133,8 +131,8 @@ class TimeController:
                 
 
     def enable_input(self, input: str|int) -> bool:
-        input = self.__input_channel_parser(input)
-        if self.__enabled(input):
+        input = self._input_channel_parser(input)
+        if self._enabled(input):
             return True
         else:
             response = zmq_exec(self.connection, f"{input}:ENAB")
@@ -146,8 +144,8 @@ class TimeController:
                 return False
         
     def disable_input(self, input: str|int) -> bool:
-        input = self.__input_channel_parser(input)
-        if not self.__enabled(input):
+        input = self._input_channel_parser(input)
+        if not self._enabled(input):
             return True
         else:
             response = zmq_exec(self.connection, f"{input}:ENAB OFF")

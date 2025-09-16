@@ -118,14 +118,14 @@ class Positioner:
         self.velocity = {'X': step_vel, 'Y': step_vel, 'Z': step_vel}
 
     @staticmethod
-    def __validate_axis(axis):
+    def _validate_axis(axis):
         if axis not in ['X', 'Y', 'Z']:
             raise ValueError("Axis must be 'X', 'Y', or 'Z'")
         return axis
 
 
     def status(self, axis: str = '') -> dict:
-        axis = self.__validate_axis(axis)
+        axis = self._validate_axis(axis)
         
         response = requests.get(f"{self.axis_url[axis]}/properties/status")
         response_json = response.json()
@@ -137,12 +137,12 @@ class Positioner:
         return response_json["deviceConnected"]
     
     def get_position(self, axis: str = "") -> float:
-        axis = self.__validate_axis(axis)
+        axis = self._validate_axis(axis)
         
         return round(self.status(axis)["theoreticalPosition"], 9)
     
     def get_velocity(self, axis: str = '') -> list:
-        axis = self.__validate_axis(axis)
+        axis = self._validate_axis(axis)
         
         response = requests.get(f"{self.axis_url[axis]}/properties/velocity")
         response_json = response.json()
@@ -150,14 +150,14 @@ class Positioner:
 
 
     def stop(self, axis: str = '') -> bool:
-        axis = self.__validate_axis(axis)
+        axis = self._validate_axis(axis)
         
         response = requests.post(f"{self.axis_url[axis]}/methods/stop()")
         return response.status_code == 200
     
     
     def move_to_position(self, axis: str = '', position: int|float = None) -> bool:
-        axis = self.__validate_axis(axis)
+        axis = self._validate_axis(axis)
 
         if not isinstance(position, (int, float)):
             raise ValueError("Position must be a numeric value")
@@ -169,13 +169,13 @@ class Positioner:
         return response.status_code == 200
 
     def zero_position(self, axis: str = '') -> bool:
-        axis = self.__validate_axis(axis)
+        axis = self._validate_axis(axis)
 
         response = requests.post(f"{self.axis_url[axis]}/methods/zero()")
         return response.status_code == 200
 
     def move_to_limit(self, axis: str = '', direction: str = 'positive') -> bool:
-        axis = self.__validate_axis(axis)
+        axis = self._validate_axis(axis)
 
         if direction not in ['positive', 'negative']:
             raise ValueError("Direction must be 'positive' or 'negative'")
@@ -185,7 +185,7 @@ class Positioner:
         return response.status_code == 200
 
     def set_velocity(self, axis: str = '', velocity: int|float = None) -> bool:
-        axis = self.__validate_axis(axis)
+        axis = self._validate_axis(axis)
 
         if not isinstance(velocity, (int, float)):
             raise ValueError("Position must be a numeric value")

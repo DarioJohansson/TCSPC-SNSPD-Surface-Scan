@@ -91,7 +91,7 @@ class TCCounter:
         self.input = None
         self.integration_time_ms = None
 
-        input = self.__input_channel_parser(input)
+        input = self._input_channel_parser(input)
         if input:
             self.input = input
             self.set_integration_time(int_time_ms)
@@ -101,15 +101,15 @@ class TCCounter:
     ################################################ FUNCTIONS ###########################################################
     
     @staticmethod
-    def __input_channel_parser(input):
+    def _input_channel_parser(input):
         if not input or (type(input) != int and type(input) != str):
-            raise ValueError("TimeController.__input_channel_parser(): invalid input type supplied.")
+            raise ValueError("TimeController._input_channel_parser(): invalid input type supplied.")
         elif type(input) == int and input not in range(1,5):
-            raise ValueError(f"TimeController.__input_channel_parser(): input channel \"{input}\" outside of bounds.")
+            raise ValueError(f"TimeController._input_channel_parser(): input channel \"{input}\" outside of bounds.")
         elif type(input) == str and input.upper() == "START":
             return "STAR"
         elif type(input) == str and input.upper() != "START":
-            raise ValueError(f"TimeController.__input_channel_parser(): \"{input}\" is not a valid input channel.")
+            raise ValueError(f"TimeController._input_channel_parser(): \"{input}\" is not a valid input channel.")
         else:
             return f"INPU{input}"
 
@@ -138,7 +138,7 @@ class TCCounter:
 
 
     def reset(self, input: str|int):
-        input = self.__input_channel_parser(input)        
+        input = self._input_channel_parser(input)        
         response = zmq_exec(self.tc, f"{input}:COUN:RESE")
         if response.upper().strip() == 'COUNTER VALUE SET TO 0':
             return True

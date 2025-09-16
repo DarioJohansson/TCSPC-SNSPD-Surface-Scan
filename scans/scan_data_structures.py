@@ -135,9 +135,9 @@ class ScanParameters:
         if filename is not None:
             self.filename = filename
 
-    def __validate_position(self, position: tuple) -> tuple:
+    def _validate_position(self, position: tuple) -> tuple:
         if len(position) != len(self.active_axes):
-            raise ValueError("ScanParameters.__validate_position(): coordinate dimension given is different from step matrix dimension.")
+            raise ValueError("ScanParameters._validate_position(): coordinate dimension given is different from step matrix dimension.")
         return position
 
     def initialize_step_sequencer(self):
