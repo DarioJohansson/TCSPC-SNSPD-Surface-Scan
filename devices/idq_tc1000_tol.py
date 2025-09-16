@@ -59,7 +59,7 @@ class TCToL:
         if not self.input or not self.bwidth or not self.bcount:
             raise Exception("TCToL: Failed to initialise. User verbose mode for more info.")
 
-    def set_bwidth(self, bwidth: int):  ## SOMETHING is off with the float int conversionto
+    def set_bwidth(self, bwidth: int) -> bool:   ## value in picoseconds.
         if bwidth:
             response = zmq_exec(self.connection, f"HIST{self.input}:BWID {bwidth}")
             if response.upper().strip() == f"VALUE SET TO {bwidth}":
@@ -73,7 +73,7 @@ class TCToL:
         else:
             raise ValueError(f"TCToL.set_bwidth(): invalid bin width supplied: {bwidth}")
     
-    def set_bcount(self, bcount: int):
+    def set_bcount(self, bcount: int) -> bool:
         if bcount:
             response = zmq_exec(self.connection, f"HIST{self.input}:BCOU {bcount}")
             if response.upper().strip() == f"VALUE SET TO {bcount}":

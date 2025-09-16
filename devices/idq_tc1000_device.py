@@ -89,19 +89,28 @@ class TimeController:
         else:
             return f"INPU{input}"
         
-        '''
-    def set_delay(self, delay: int):
-        if delay:
-            response = zmq_exec(self.connection, f"HIST{self.input}: {delay}")
-            if response.upper().strip() == f"VALUE SET TO {delay}":
-                return True
-            if self.verbose:
-                print(f"TCToL.set_bcount(): Error from device -> {response}")
-            return False
-        
+    
+    def delay(self, input: int|str, delay: int = None) -> int|bool:  ## in picoseconds
+        if type(input) == int and input in range(1,5):
+            pass
         else:
-            raise ValueError(f"TCToL.set_bcount(): invalid bin count supplied: {delay}")
-    '''
+            raise ValueError("TimeController.delay(): Invalid input channel provided.")
+                    
+        if delay:
+            if type(delay) == int:
+                response = zmq_exec(self.connection, f"DELA{input}:VALU {delay}")
+                if response.upper().strip() == f"VALUE SET TO {delay}":
+                    return True
+                if self.verbose:
+                    print(f"TCToL.set_bcount(): Error from device -> {response}")
+                return False
+            else:
+                raise ValueError("TimeController.delay(): delay type is wrong.")
+        else:
+            response = zmq_exec(self.connection, f"DELA{input}:VALU?")
+            response = int(response.replace("TB", ""))
+            return response
+    
             
     def threshold(self, input: int|str, threshold: int|float = None) -> str|bool:
         if type(threshold) not in [float, int] and threshold != None:

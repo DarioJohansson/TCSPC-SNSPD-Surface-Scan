@@ -1,0 +1,23 @@
+{
+    "resolution": {
+        "X": 0,
+        "Y": 2,
+        "Z": 2
+    },
+    "step_size": {
+        "X": 0,
+        "Y": 5e-06,
+        "Z": 5e-06
+    },
+    "step_velocity": 4.9999999999999996e-05,
+    "polling_frequency": 100,
+    "counter_integration_time": 1000,
+    "tol_acquisition_time": 30,
+    "sleep_time": 1,
+    "error_silent": true,
+    "filename": null,
+    "max_positioner_retries": 10,
+    "tol_bcount": 1000,
+    "tol_bwidth": 1000,
+    "tol_delay": 1400000
+}
