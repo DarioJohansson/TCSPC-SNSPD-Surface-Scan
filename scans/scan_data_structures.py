@@ -99,7 +99,10 @@ class ScanParameters:
         counter_integration_time = None,
         tol_acquisition_time = None,
         error_silent = None,
-        max_positioner_retries = None
+        max_positioner_retries = None,
+        tol_bcount = None,
+        tol_bwidth = None,
+        tol_delay = None
     ):
         # defaults
         self.resolution = {"X": 0, "Y": 0, "Z": 0}
@@ -112,6 +115,9 @@ class ScanParameters:
         self.error_silent = True
         self.filename = None
         self.max_positioner_retries = 10
+        self.tol_bcount = 100
+        self.tol_bwidth = 100
+        self.tol_delay = 1000000  # in picoseconds.
 
     
         if resolution is not None:
@@ -134,6 +140,13 @@ class ScanParameters:
             self.error_silent = error_silent
         if filename is not None:
             self.filename = filename
+        if tol_bcount is not None:
+            self.tol_bcount = tol_bcount
+        if tol_bwidth is not None:
+            self.tol_bwidth = tol_bwidth
+        if tol_delay is not None:
+            self.tol_delay = tol_delay
+        
 
     def _validate_position(self, position: tuple) -> tuple:
         if len(position) != len(self.active_axes):
@@ -193,6 +206,9 @@ class ScanResults:
 
 
     def get_data(self, position: dict, data_type = None) -> list:  
+        if tuple(pos for pos in position.keys()) != self.active_axes:
+            raise ValueError("ScanResults.get_data(): requested a position on a non-existent axis.")
+        
         tuple_position = tuple(value for value in position.values()) 
         if data_type not in [CountData, ToLData] and data_type != None:
             raise TypeError("ScanResults.get_data(): Provided wrong datatype for extraction.")
