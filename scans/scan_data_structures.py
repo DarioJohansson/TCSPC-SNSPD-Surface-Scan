@@ -192,8 +192,12 @@ class ScanResults:
         self.data_matrix[tuple_position].append(value)
 
 
-    def get_data(self, position: dict, data_type = None) -> list:  
-        tuple_position = tuple(value for value in position.values()) 
+    def get_data(self, position: dict|tuple, data_type = None) -> list:  
+        if type(position) == dict:
+            tuple_position = tuple(value for value in position.values()) 
+        elif type(position) == tuple:
+            tuple_position = position
+
         if data_type not in [CountData, ToLData] and data_type != None:
             raise TypeError("ScanResults.get_data(): Provided wrong datatype for extraction.")
         
