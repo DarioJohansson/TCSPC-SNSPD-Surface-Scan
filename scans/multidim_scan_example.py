@@ -38,6 +38,7 @@ try:
     input1_counter = timecontroller.get_counter(1)
     input1_tol = timecontroller.get_tol(1)
 
+
     while not timecontroller.threshold(1, -0.1) or not timecontroller.threshold("start", -0.3):
         print("Could not set voltage threshold. Retrying")
         time.sleep(0.5)
@@ -69,6 +70,33 @@ scan_set.step_velocity=50 * 1e-6    # meters/sec  ##IMPLEMENT THIS IN THE POSITI
 scan_set.resolution["Z"]=2
 scan_set.resolution["Y"]=2
 input1_counter.set_integration_time(scan_set.counter_integration_time)
+scan_set.tol_acquisition_time = 30
+scan_set.tol_bcount = 1000
+scan_set.tol_bwidth = 1000
+scan_set.tol_delay = 1400000
+
+if input1_tol.set_bwidth(scan_set.tol_bwidth):
+    print(f"Set bin width to {scan_set.tol_bwidth}")
+if input1_tol.set_bcount(scan_set.tol_bcount):
+    print(f"Set bin count to {scan_set.tol_bcount}")
+if timecontroller.delay(1, scan_set.tol_delay):
+    print(f"Set historgram delay for TOL to {scan_set.tol_delay}")
+
+
+scan_started = False
+
+def time_calculator(scan_settings):
+    time_per_grid_point = scan_settings.tol_acquisition_time + (scan_settings.counter_integration_time * 1e-3) + scan_settings.sleep_time
+    grid_tuple = tuple(value for value in scan_settings.resolution.values())
+    result = 0
+    for i in grid_tuple:
+        if result == 0:
+            result = i
+        else:
+            result = result * i
+    
+    return result * time_per_grid_point
+
 
 scan_sequencer = scan_set.initialize_step_sequencer()       # Initializes the sequencer, which is the object calculating the next movement of the positioner.
 
@@ -111,13 +139,16 @@ def measure_tol(step_index_vector: dict, scan_results: ScanResults, acquisition_
     scan_results.input_data(step_index_vector, data_obj)                    # Inputs the diagram and proceeds
 ########################################################################################
 
-def exit():
-    print("Received signal to stop.")
-    for axis in axis_list:
-        positioner.stop(axis)
-    for i in ["start", 1]:
-        timecontroller.disable_input(i)
-    
+def exit(signum, frame):
+    print(f"Received signal {signum} to stop.")
+    if scan_started:
+        for axis in axis_list:
+            print(f"Stopping positioner {axis}")
+            positioner.stop(axis)
+        for i in ["start", 1]:
+            print(f"Disabling timecontroller input {i}")
+            timecontroller.disable_input(i)
+        
     sys.exit(0)
 
 
@@ -128,15 +159,15 @@ signal.signal(signal.SIGTERM, exit)  # kill <pid>
 
 
 
-# MAIN LOOP LOGIC:
-
-
+print(f"Tempo presvisto per scansione: {round(time_calculator(scan_set)/60, 3)}")
 print("Tutto pronto. Premi invio...")
 input()
 
+
+scan_started = True
 start_time = time.time()
 
-'''                                                     # Simulating for now.
+########### ZEROING ALL POSITIONER AXES ############
 for axis in axis_list:
     while not positioner.zero_position(axis):
         positioner.zero_position(axis)
@@ -144,14 +175,19 @@ for axis in axis_list:
 
     print(f"Zeroed {axis} axis.")
     time.sleep(0.25)
-'''
+####################################################
+
+# here i initialise the index vector first so the first zeroeth step is registered correctly. this will be then ovveridden by the next_step_in_Sequence method by
+# the sequencer each new iteration.
 
 index_vector = {axis: 0 for axis in axis_list}
 
+################################################### MAIN LOOP LOGIC ####################################################
 while True:
     
     print(f"Current Position Index: {index_vector}")
 
+    # Measurement stage:
     print("Measuring photon incidence freq:")
     measure_frequency(index_vector, scan_res, input1_counter)
     print(f"Measuring photon ToL for {scan_set.tol_acquisition_time} seconds:")
@@ -165,23 +201,24 @@ while True:
         index_vector = next[0]
         motion_instructions = next[1]
 
+    # Motion stage: the scan motion receives an instruction list from the sequencer. It moves the positioners to the correct positions and updates it's 
+    # internal records.
+
     for instruction in motion_instructions:
         print(f"Moving Positioner to: {instruction}")
         
-        '''
-        scan_motion(instruction, scan_set, positioner)   ## Simulating for now, remove quotes when motion is required.
-        '''
+        scan_motion(instruction, scan_set, positioner)
 
     time.sleep(scan_set.sleep_time)   # Another optional sleep margin, although not necessary.
 
 end_time=time.time()
-
+scan_started = False
 print(f"Time Elapsed for Scan: {end_time-start_time} S")
+##############################################################################################################################
 
 
-
-scan_res.save("C:\\Users\\cinzi\\Desktop\\scan-dump.json")
-scan_set.save("C:\\Users\\cinzi\\Desktop\\scan-settings.json")
+scan_res.save("scan-dump.json")
+scan_set.save("scan-settings.json")
 
 print("Premi invio per uscire...")
 input()
