@@ -110,12 +110,11 @@ class CryoController:
 ######################################### Rookie Nanopositioner Functions ###########################################
 
 class Positioner:
-    def __init__(self, IPaddress: str, step_vel: float = 1.0):
-        step_vel = float(step_vel)
+    def __init__(self, IPaddress: str):
         self.base_url = f"http://{IPaddress}:47171/v1"
         self.axes_base_url = f"{self.base_url}/stacks/stack1/axes"
         self.axis_url = {'X': f"{self.axes_base_url}/axis2", 'Y': f"{self.axes_base_url}/axis1", 'Z': f"{self.axes_base_url}/axis3"}
-        self.velocity = {'X': step_vel, 'Y': step_vel, 'Z': step_vel}
+        self.velocity = {'X': self.get_velocity("X"), 'Y': self.get_velocity("X"), 'Z': self.get_velocity("X")}
 
     @staticmethod
     def _validate_axis(axis):
@@ -163,9 +162,11 @@ class Positioner:
             raise ValueError("Position must be a numeric value")
         # Assuming we have a method to set the position on the device
         # Set position on the device for the specified axis
+        current_position = self.get_position(axis)
+        travel_distance = abs(round(position-current_position, 9))
         position = format(position, '.17f')
         response = requests.post(f"{self.axis_url[axis]}/methods/moveAbsolute(double:pos)", data=position, headers={"Content-Type": "text/plain"})
-                
+        time.sleep(round(travel_distance/self.velocity[axis], 3))        
         return response.status_code == 200
 
     def zero_position(self, axis: str = '') -> bool:

@@ -69,7 +69,7 @@ class StepSequencer():
                     self.step_counter[axis] = 0
 
             # Now convert indexes to positions via the step size matrix 
-            new_position_vector = {axis: self.step_counter[axis] * self.step_size[axis] for axis in self.active_axes}
+            new_position_vector = {axis: round(self.step_counter[axis] * self.step_size[axis], 9) for axis in self.active_axes}
             self.position = new_position_vector
             index_vector = self.step_counter
             motion_instructions = diff_positions(old_position_vector, new_position_vector)

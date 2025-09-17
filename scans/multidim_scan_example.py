@@ -64,16 +64,18 @@ except Exception as e:
 scan_set = ScanParameters()
 
 axis_list = ["Y", "Z"]
-scan_set.step_size["Z"]=0.000005   # metres
-scan_set.step_size["Y"]=0.000005   # metres
+scan_set.step_size["Z"]=0.00001   # metres
+scan_set.step_size["Y"]=0.00001   # metres
 scan_set.step_velocity=50 * 1e-6    # meters/sec  ##IMPLEMENT THIS IN THE POSITIONER CLASS. doing it manually from screen
-scan_set.resolution["Z"]=2
-scan_set.resolution["Y"]=2
+scan_set.resolution["Z"]=60
+scan_set.resolution["Y"]=60
+scan_set.counter_integration_time = 200
 input1_counter.set_integration_time(scan_set.counter_integration_time)
 scan_set.tol_acquisition_time = 30
 scan_set.tol_bcount = 1000
 scan_set.tol_bwidth = 1000
-scan_set.tol_delay = 1400000
+scan_set.tol_delay = 1800000
+scan_set.sleep_time = 0
 
 if input1_tol.set_bwidth(scan_set.tol_bwidth):
     print(f"Set bin width to {scan_set.tol_bwidth}")
@@ -85,11 +87,17 @@ if timecontroller.delay(1, scan_set.tol_delay):
 
 scan_started = False
 
-def time_calculator(scan_settings):
-    time_per_grid_point = scan_settings.tol_acquisition_time + (scan_settings.counter_integration_time * 1e-3) + scan_settings.sleep_time
+def time_calculator(scan_settings, count=False, tol=False):
+    time_per_grid_point = scan_settings.sleep_time
+    if count:
+        time_per_grid_point += scan_settings.counter_integration_time*1e-3
+    if tol:
+        time_per_grid_point += scan_settings.tol_acquisition_time
+    
     grid_tuple = tuple(value for value in scan_settings.resolution.values())
     result = 0
-    for i in grid_tuple:
+    
+    for i in grid_tuple:  #DIY tuple multiplication
         if result == 0:
             result = i
         else:
@@ -115,8 +123,7 @@ def scan_motion(position_instruction: dict[str, float], scan_settings: ScanParam
         positioner.move_to_position(position_instruction["axis"], position_instruction["position"])
 
         positioner.wait_end_motion(position_instruction["axis"], scan_settings.polling_frequency)
-        time.sleep(0.25) # safety sleep
-        
+        #time.sleep(0.25) # safety sleep
         actual_position=positioner.get_position(position_instruction["axis"])
 
         if try_count == scan_settings.max_positioner_retries:
@@ -159,7 +166,7 @@ signal.signal(signal.SIGTERM, exit)  # kill <pid>
 
 
 
-print(f"Tempo presvisto per scansione: {round(time_calculator(scan_set)/60, 3)}")
+print(f"Tempo presvisto per scansione: {round(time_calculator(scan_set, count=True)/60, 1)} minuti.")
 print("Tutto pronto. Premi invio...")
 input()
 
@@ -190,8 +197,8 @@ while True:
     # Measurement stage:
     print("Measuring photon incidence freq:")
     measure_frequency(index_vector, scan_res, input1_counter)
-    print(f"Measuring photon ToL for {scan_set.tol_acquisition_time} seconds:")
-    measure_tol(index_vector, scan_res, scan_set.tol_acquisition_time, input1_tol)
+    #print(f"Measuring photon ToL for {scan_set.tol_acquisition_time} seconds:")
+    #measure_tol(index_vector, scan_res, scan_set.tol_acquisition_time, input1_tol)
     
     next = scan_sequencer.next_step_in_sequence()
     
