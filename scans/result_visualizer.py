@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np
+from scans.graph_functions import *
 from scans.scan_data_structures import *
 from matplotlib.ticker import FuncFormatter
 from functools import partial
@@ -86,6 +87,7 @@ def interactive_2D_grid(results, settings):
     to_physical_cols_fn = lambda y: y*(settings.step_size[axes[1]]*1e6)
     norm_cols_fn = lambda u: u/(settings.step_size[axes[1]]*1e6)
 
+    
     # Create a second axis on top and right
     ax_top = ax.secondary_xaxis("top", functions=(to_physical_rows_fn, norm_rows_fn))
     ax_right = ax.secondary_yaxis("right", functions=(to_physical_cols_fn, norm_cols_fn))
@@ -143,49 +145,11 @@ def interactive_2D_grid(results, settings):
         ax.add_patch(rect)
         #ax.text(j, i, f"{str(results[i, j])}\n{results.get_data((i,j), CountData).frequency()}", va='center', ha='center', color="red")
 
-    def show_tol_graph(event):
-        def update_annot(ev, obj, annot, _fig, _ax):
-            if ev.inaxes == _ax:
-                if ev.key == "control":
-                    # nearest index in obj.x_data
-                    idx = np.searchsorted(obj.x_data, ev.xdata)
-                    if 0 <= idx < len(obj.x_data):
-                        annot.xy = (obj.x_data[idx], obj.y_data[idx])
-                        text = f"x={obj.x_data[idx]} (ps), y={obj.y_data[idx]:.2f}"
-                        annot.set_text(text)
-                        annot.set_visible(True)
-                        _fig.canvas.draw_idle()
-            else:
-                annot.set_visible(False)
-                _fig.canvas.draw_idle()
-
-        if event.inaxes == ax:
-            col = int(round(event.xdata))
-            row = int(round(event.ydata))
-            index = (row,col)
-            if 0 <= row < rows and 0 <= col < cols:
-                count_obj =  results.get_data(index, CountData)
-                tol_obj = results.get_data(index, ToLData)
-                _fig,_ax = plt.subplots()
-                annot = _ax.annotate(
-                    "", xy=(0,0), xytext=(15,15), textcoords="offset points",
-                    bbox=dict(boxstyle="round", fc="w"),
-                    arrowprops=dict(arrowstyle="->")
-                )
-                annot.set_visible(False)
-                _ax.plot(tol_obj.x_data, tol_obj.y_data, drawstyle="steps-mid")
-                _ax.set_title(f"Position: {axes[0]}={to_physical_rows_fn(row)}(µm) {axes[1]}={to_physical_cols_fn(col)}(µm)\nPhoton Frequency: {count_obj.frequency()} (Hz)\nTimestamp Delay: {settings.tol_delay} (ps)\nTime Acquired: {datetime.fromtimestamp(tol_obj.time_created)}", fontsize=10, fontweight="bold")
-                _ax.set_xlabel("Time from start signal + delay (ps)", fontsize=10)
-                _ax.set_ylabel("Counts per bin", fontsize=10)
-                _ax.grid(True, linestyle="--", alpha=0.6)
-                _fig.canvas.mpl_connect("motion_notify_event", partial(update_annot, obj=tol_obj, annot=annot, _fig=_fig, _ax=_ax))
-                _fig.show()
-
-            else:
-                raise ValueError("Out of bounds.")
+    
+   
 
 
-    fig.canvas.mpl_connect("button_press_event", show_tol_graph)
+    fig.canvas.mpl_connect("button_press_event", partial(show_tol_graph, ax=ax, results=results, settings=settings, row_scale_fn=to_physical_rows_fn, col_scale_fn=to_physical_cols_fn, axes=axes))
     fig.canvas.mpl_connect("motion_notify_event", partial(update_grid_annot, obj=results, annot=annot, _fig=fig, _ax=ax))
     plt.gca().invert_yaxis()
     plt.show()
