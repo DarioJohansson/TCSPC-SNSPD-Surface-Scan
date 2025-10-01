@@ -12,7 +12,7 @@ class TimeController:
         self.devices = []
         self.status = {}
 
-        
+    '''    
     def get_status(self) -> dict:
         
         blob = zmq_exec(self.connection, "STAT?").upper()
@@ -20,6 +20,7 @@ class TimeController:
 
         lines = blob.strip().split('\n')
 
+        # This part needs refining, as the response from the time tagger is difficult to parse
         for line in lines:
             if not line.strip():
                 continue
@@ -56,7 +57,7 @@ class TimeController:
                     result[full_key] = True
 
         return result
-
+    '''
     def get_counter(self, input: int|str = None):
         if input == None:
             raise ValueError("TimeController.get_counter(): did not supply an input channel.")

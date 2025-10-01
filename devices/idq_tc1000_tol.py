@@ -1,7 +1,7 @@
 import time
 from utils.common import zmq_exec
-from utils.acquisitions.histograms import *
-import ast
+from utils.acquisitions.histograms import wait_end_of_acquisition
+from ast import literal_eval
 
 # needs work to implement the class
 
@@ -111,7 +111,7 @@ class TCToL:
         wait_end_of_acquisition(self.connection)
 
         # Get histogram data
-        Y_data = ast.literal_eval(zmq_exec(self.connection, f"HIST{self.input}:DATA?"))
+        Y_data = literal_eval(zmq_exec(self.connection, f"HIST{self.input}:DATA?"))
         X_data = [i * self.bwidth for i in range(self.bcount)]
         data_object = ToLData(x_data=X_data, y_data=Y_data)
         return data_object

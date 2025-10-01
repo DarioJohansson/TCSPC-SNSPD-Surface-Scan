@@ -122,8 +122,12 @@ class Positioner:
             raise ValueError("Axis must be 'X', 'Y', or 'Z'")
         return axis
 
-
-    def status(self, axis: str = '') -> dict:
+    def _time_of_travel(self, axis, new_position):
+        current_position = self.get_position(axis)
+        travel_distance = abs(round(new_position-current_position, 9))
+        return round(travel_distance/self.velocity[axis], 3)
+    
+    def get_status(self, axis: str = '') -> dict:
         axis = self._validate_axis(axis)
         
         response = requests.get(f"{self.axis_url[axis]}/properties/status")
@@ -138,7 +142,7 @@ class Positioner:
     def get_position(self, axis: str = "") -> float:
         axis = self._validate_axis(axis)
         
-        return round(self.status(axis)["theoreticalPosition"], 9)
+        return round(self.get_status(axis)["theoreticalPosition"], 9)
     
     def get_velocity(self, axis: str = '') -> list:
         axis = self._validate_axis(axis)
@@ -160,13 +164,10 @@ class Positioner:
 
         if not isinstance(position, (int, float)):
             raise ValueError("Position must be a numeric value")
-        # Assuming we have a method to set the position on the device
-        # Set position on the device for the specified axis
-        current_position = self.get_position(axis)
-        travel_distance = abs(round(position-current_position, 9))
+        
         position = format(position, '.17f')
         response = requests.post(f"{self.axis_url[axis]}/methods/moveAbsolute(double:pos)", data=position, headers={"Content-Type": "text/plain"})
-        time.sleep(round(travel_distance/self.velocity[axis], 3))        
+        time.sleep(self._time_of_travel(axis, position))        
         return response.status_code == 200
 
     def zero_position(self, axis: str = '') -> bool:
@@ -197,7 +198,7 @@ class Positioner:
 
         start=time.time()
         
-        while self.status(axis)["moving"]:
+        while self.get_status(axis)["moving"]:
             time.sleep(1/polling_frequency)
 
         end=time.time()
