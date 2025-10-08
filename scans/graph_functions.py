@@ -7,20 +7,45 @@ from datetime import datetime
 
 # # ToL popup render and format functions
 
-def update_annot(ev, obj, annot, _fig, _ax):
+    # Annotation function:
+def update_grid_annot(ev, 
+                      results, 
+                      annot,
+                      _fig,
+                      _ax,
+                      row_scale_fn, 
+                      col_scale_fn, 
+                      axes
+                    ):
+    rows, cols = results.data_dims
     if ev.inaxes == _ax:
         if ev.key == "control":
-            # nearest index in obj.x_data
-            idx = np.searchsorted(obj.x_data, ev.xdata)
-            if 0 <= idx < len(obj.x_data):
-                annot.xy = (obj.x_data[idx], obj.y_data[idx])
-                text = f"x={obj.x_data[idx]} (ps), y={obj.y_data[idx]:.2f}"
+            row = int(round(ev.xdata))
+            col = int(round(ev.ydata))
+            if 0 <= row < rows and 0 <= col < cols:
+                annot.xy = (row, col)
+                text = f"{axes[0]}={row_scale_fn(row)} (µm), {axes[1]}={col_scale_fn(col)} (µm)"
                 annot.set_text(text)
                 annot.set_visible(True)
                 _fig.canvas.draw_idle()
     else:
         annot.set_visible(False)
         _fig.canvas.draw_idle()
+
+def update_tol_annot(ev, obj, annot, _fig, _ax):
+            if ev.inaxes == _ax:
+                if ev.key == "control":
+                    # nearest index in obj.x_data
+                    idx = np.searchsorted(obj.x_data, ev.xdata)
+                    if 0 <= idx < len(obj.x_data):
+                        annot.xy = (obj.x_data[idx], obj.y_data[idx])
+                        text = f"x={obj.x_data[idx]} (ps), y={obj.y_data[idx]:.2f}"
+                        annot.set_text(text)
+                        annot.set_visible(True)
+                        _fig.canvas.draw_idle()
+            else:
+                annot.set_visible(False)
+                _fig.canvas.draw_idle()
 
 def to_normal(event, ax, fig):
     ax.set_yscale("linear")
@@ -47,7 +72,7 @@ def on_resize(event, ax, fig, left_pos):
             
 
 active_figs=[]
-def show_tol_graph(
+def show_tol_graph_2D(
         event, 
         ax, 
         results,
@@ -87,7 +112,7 @@ def show_tol_graph(
             _ax.set_xlabel("Time from start signal + delay (ps)", fontsize=10)
             _ax.set_ylabel("Counts per bin", fontsize=10)
             _ax.grid(True, linestyle="--", alpha=0.6)
-            _fig.canvas.mpl_connect("motion_notify_event", partial(update_annot, obj=tol_obj, annot=annot, _fig=_fig, _ax=_ax))
+            _fig.canvas.mpl_connect("motion_notify_event", partial(update_tol_annot, obj=tol_obj, annot=annot, _fig=_fig, _ax=_ax))
             _fig.canvas.mpl_connect("resize_event", partial(on_resize, ax=ax1, fig=_fig, left_pos=20))
             _fig.canvas.mpl_connect("resize_event", partial(on_resize, ax=ax2, fig=_fig, left_pos=130))
             _fig.show()

@@ -30,13 +30,7 @@ class CryoController:
         controller.IPaddress = IPaddress
         controller.base_url = f"http://{IPaddress}:47101/v1"
         controller.url = f"http://{IPaddress}:47101/v1/controller"
-        controller.headers = {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        }
-        controller.vacuum_pump_url = controller.base_url + "/vacuumSystem"
-        controller.raffreddatore_url = controller.base_url + "/cooler"
-        controller.sample_chamber_url = controller.base_url + "/sampleChamber" 
+        controller.vacuum_pump_url = controller.base_url + "/vacuumSystem" 
     
     def get_status(controller, string: bool = False):
         response = requests.get(f"{controller.url}/properties/systemState")

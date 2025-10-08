@@ -1,6 +1,5 @@
 import numpy as np
 import sys
-import os
 import json
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
@@ -21,24 +20,24 @@ class StepSequencer():
         self.step_counter = {}
         self.active_axes = ()
         self.position = {}
-        self.initialize_step_matrix()
+        self._initialize_step_matrix()
 
     
     def zero_counter(self):
         for axis in self.step_counter.keys():
             self.step_counter[axis] = 0
 
-    def initialize_step_matrix(self):
+    def _initialize_step_matrix(self):
         
         step_dims = tuple(size for size in self.resolution.values() if size > 0)
         self.active_axes = tuple(axis for axis, size in self.resolution.items() if size > 0)
         
         if not step_dims:
-            raise ValueError("StepSequencer.initialize_step_matrix(): At least one resolution must be nonzero")
+            raise ValueError("StepSequencer._initialize_step_matrix(): At least one resolution must be nonzero")
         
         for axis in self.active_axes:
             if self.step_size[axis] == 0:
-                raise ValueError("StepSequencer.initialize_step_matrix(): Step sizes for active axes must be different from 0")
+                raise ValueError("StepSequencer._initialize_step_matrix(): Step sizes for active axes must be different from 0")
                 
         for axis in self.active_axes:
             self.position.update({axis: 0})
@@ -61,7 +60,7 @@ class StepSequencer():
 
         # Next Step Index calculation        
         if self.step_counter != {axis: self.resolution[axis] - 1 for axis in self.active_axes}:
-            for axis, value in self.step_counter.items():       ## Algorithm iterations: 4 works correctly now.
+            for axis, value in self.step_counter.items():       ## Algorithm iterations: 4 works correctly now, finally
                 if value < self.resolution[axis] - 1:
                     self.step_counter[axis] += 1
                     break
@@ -117,7 +116,7 @@ class ScanParameters:
         self.max_positioner_retries = 10
         self.tol_bcount = 100
         self.tol_bwidth = 100
-        self.tol_delay = 1000000  # in picoseconds.
+        self.tol_delay = 0  # in picoseconds.
 
     
         if resolution is not None:
@@ -147,11 +146,6 @@ class ScanParameters:
         if tol_delay is not None:
             self.tol_delay = tol_delay
         
-
-    def _validate_position(self, position: tuple) -> tuple:
-        if len(position) != len(self.active_axes):
-            raise ValueError("ScanParameters._validate_position(): coordinate dimension given is different from step matrix dimension.")
-        return position
 
     def initialize_step_sequencer(self):
         return StepSequencer(self.resolution, self.step_size)
@@ -258,7 +252,7 @@ class ScanResults:
             return False
 
     @staticmethod
-    def load(path:str):
+    def load(path:str) -> ScanParameters:
         if not path:
             raise ValueError("ScanResults.load(): path must be given to load from file.")
 
@@ -285,34 +279,6 @@ class ScanResults:
             
         return obj
 
-
-class Graph2D:
-    def __init__(self):
-        self.fig, self.ax = plt.subplots()
-        self.title = {"name": "", "font": "", "fontsize": 16, "fontweight": "bold"}
-        self.xlabel = {"name": "", "font": "", "fontsize": 10, "fontweight": "normal"}
-        self.ylabel = {"name": "", "font": "", "fontsize": 10, "fontweight": "normal"}
-        self.xaxis_majorlocator = 1
-        self.yaxis_majorlocator = 1
-        self.grid = {"visible": True, "linestyle": "--", "alpha": 1}
-        self.file = {"name": "graph.png", "dpi": 500}
-
-    def apply_settings(self):
-        self.ax.set_title(self.title["name"], fontsize=self.title["fontsize"], fontweight=self.title["fontweight"])
-        self.ax.set_xlabel(self.xlabel["name"], fontsize=self.xlabel["fontsize"], fontweight=self.xlabel["fontweight"])
-        self.ax.set_ylabel(self.ylabel["name"], fontsize=self.ylabel["fontsize"], fontweight=self.ylabel["fontweight"])
-        self.ax.xaxis.set_major_locator(MultipleLocator(self.xaxis_majorlocator))
-        self.ax.yaxis.set_major_locator(MultipleLocator(self.yaxis_majorlocator))
-        self.ax.grid(self.grid["visible"], linestyle=self.grid["linestyle"], alpha=self.grid["alpha"])
-
-    def plot(self, x_data_list, y_data_list):
-        self.ax.plot(x_data_list, y_data_list)
-
-    def save(self):
-        self.fig.savefig(self.file["name"], dpi=self.file["dpi"])
-
-    def show(self):
-        self.fig.show()
 
 
 

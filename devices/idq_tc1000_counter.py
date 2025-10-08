@@ -10,35 +10,6 @@ counter = TCCounter(tc)
 
 "counter" è ora un oggetto inizializzato che ha tutte le funzionalità rilevanti per contare i fotoni in arrivo nei canali di input.
 Inizializzando solo con tc;  i parametri di tempo di integrazione, canale di input, modalità e verbose rimangono quelli predefiniti.
-
-tc è un parametro necessario e rappresenta anch’esso un oggetto: in questo caso è un oggetto di connessione generato da una funzione del modulo utils.common.
-La funzione connect() accetta un indirizzo IP e una porta, e restituisce un oggetto contesto di connessione, se la connessione ha successo. Questo oggetto viene poi passato al costruttore del counter per poter funzionare.
-È il riferimento fisico usato per comunicare tra il codice e il dispositivo TC.
-
-Un esempio di codice pienamente funzionante è il seguente:
-
-##INIZIO
-
-from utils.common import zmq_exec, connect
-
-tc = connect('169.254.207.101', port=5555)      # Crea l'oggetto di connessione tc specificando l'ip e la porta SCPI del TC IDQ
-counter = TCCounter(tc)                         # Crea un counter utilizzando la connessione esistente.
-
-if counter.enabled():                           # Controlla se è abilitato.
-    count = counter.count()                     # Restituisce il numero di fotoni misurati nella finestra di integrazione, che di default è 1000ms.
-    print(count)                                # Stampa il conteggio sulla console.
-else:
-    counter.enable_input()                 
-    count = counter.count()                 
-    print(count) 
-
-counter.disable_input()                         # Disabilita la routine di conteggio sul controller.
-
-##FINE
-
-È uno snippet stupido ma serve solo a dimostrare il concetto.
-In Python, gli oggetti possono memorizzare variabili uniche, che sono utili per contestualizzare ogni oggetto in base al suo stato.
-Questo oggetto verrà usato per fare una mappa d’intensità sul campione, dato che l’operazione è rapidissima e non richiede particolare precisione.
 '''
 
 class CountData:

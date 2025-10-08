@@ -23,7 +23,7 @@ def interactive_1D_graph(results, settings):
     for idx in np.ndindex(results.data_dims):
         Y_data.append(results.get_data(idx, CountData).frequency())
     
-    def show_tol_graph(event):
+    def show_tol_graph_1D(event):
         def update_annot(ev, obj, annot, _fig, _ax):
             if ev.inaxes == _ax:
                 if ev.key == "control":
@@ -62,7 +62,7 @@ def interactive_1D_graph(results, settings):
             else:
                 raise ValueError(f"Out of bounds: {col}")
 
-    fig.canvas.mpl_connect("button_press_event", show_tol_graph)
+    fig.canvas.mpl_connect("button_press_event", show_tol_graph_1D)
     ax.plot(X_data, Y_data)
     plt.show()
 
@@ -101,23 +101,6 @@ def interactive_2D_grid(results, settings):
     )
     annot.set_visible(False)
 
-    # Annotation function:
-    def update_grid_annot(ev, obj, annot, _fig, _ax):
-        if ev.inaxes == _ax:
-            if ev.key == "control":
-                row = int(round(ev.xdata))
-                col = int(round(ev.ydata))
-                if 0 <= row < rows and 0 <= col < cols:
-                    annot.xy = (row, col)
-                    text = f"{axes[0]}={to_physical_rows_fn(row)} (µm), {axes[1]}={to_physical_cols_fn(col)} (µm)"
-                    annot.set_text(text)
-                    annot.set_visible(True)
-                    _fig.canvas.draw_idle()
-        else:
-            annot.set_visible(False)
-            _fig.canvas.draw_idle()
-
-
 
     # color function
     min_freq=None
@@ -149,17 +132,43 @@ def interactive_2D_grid(results, settings):
    
 
 
-    fig.canvas.mpl_connect("button_press_event", partial(show_tol_graph, ax=ax, results=results, settings=settings, row_scale_fn=to_physical_rows_fn, col_scale_fn=to_physical_cols_fn, axes=axes))
-    fig.canvas.mpl_connect("motion_notify_event", partial(update_grid_annot, obj=results, annot=annot, _fig=fig, _ax=ax))
+    fig.canvas.mpl_connect("button_press_event", partial(show_tol_graph_2D, ax=ax, results=results, settings=settings, row_scale_fn=to_physical_rows_fn, col_scale_fn=to_physical_cols_fn, axes=axes))
+    fig.canvas.mpl_connect("motion_notify_event", partial(update_grid_annot, results=results, annot=annot, _fig=fig, _ax=ax, row_scale_fn=to_physical_rows_fn, col_scale_fn=to_physical_cols_fn, axes=axes))
     plt.gca().invert_yaxis()
     plt.show()
 
 
 if __name__ == "__main__":
+    results_filepath = None
+    parameters_filepath = None
+    while True:
+        # Scan Results Path
+        results_path_input = input(f"Enter the full filepath of the results file:")
+        if results_path_input.strip():
+            base_dir = os.path.dirname(os.path.abspath(results_path_input)) or '.'
 
-    results = ScanResults.load("results\\scan-10x10-tol.json")
-    settings = ScanParameters.load("results\\scan-10x10-tol-settings.json")
+            if not os.path.isdir(base_dir) or not os.access(base_dir, os.W_OK):
+                print("Results Filepath Invalid (not accessible or non-existent)")
+                continue
+            else:
+                results_filepath = results_path_input.strip()
+        
+        # Scan Parameters Path
+        params_path_input = input(f"Enter the full filepath of the scan-settings file:")
+        if params_path_input.strip():
+            base_dir = os.path.dirname(os.path.abspath(params_path_input)) or '.'
 
+            if not os.path.isdir(base_dir) or not os.access(base_dir, os.W_OK):
+                print("Results Filepath Invalid (not accessible or non-existent)")
+                continue
+            else:
+                parameters_filepath = params_path_input.strip()
+        print("\nProcessing files...\n\n")
+        break
+
+        
+    results = ScanResults.load(results_filepath)
+    settings = ScanParameters.load(parameters_filepath)
     if len(results.data_dims) == 1:
         interactive_1D_graph(results,settings)
     elif len(results.data_dims) == 2:

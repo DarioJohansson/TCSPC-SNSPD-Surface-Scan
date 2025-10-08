@@ -1,26 +1,10 @@
-
-
-'''
-
-First iteration of scan on a sample. This scan's structure must be something of the kind:
-- Initiate necessary devices in correct order with hardcoded addresses
-- Create data structure for measurements, which is a list with positions and counts
-
-- Create a step list in sequence, which means a list populated by the values in which the nanopositioner will have to step on.
-- The nanopositioner then zeroes it's position
-- Sets a velocity
-- The timecontroller records count and DataCount object has a time and frequency information.
-
-'''
 from devices.idq_tc1000_device import *
 from devices.montana_cryoadvance_controls import *
 from scans.scan_data_structures import *
-from utils.common import connect
-import matplotlib.pyplot as plt
-from matplotlib.ticker import MultipleLocator
 import time
 import signal
 import sys
+import os
 
 ## some util functions before we start:
 
@@ -73,6 +57,8 @@ except Exception as e:
 ################################ Scan Settings #####################################
 
 scan_set = ScanParameters()
+results_filepath = None
+parameters_filepath = None
 # Default values
 axis_list = ["Y", "Z"]            
 scan_set.step_size["Z"] = 0.00001   # metres
@@ -94,6 +80,28 @@ start_threshold = -0.3
 # --- USER PROMPTS ---
 
 while settings_not_applied:
+    # Scan Results Path
+    results_path_input = input(f"Enter the full filepath of where the results file should be saved:")
+    if results_path_input.strip():
+        base_dir = os.path.dirname(os.path.abspath(results_path_input)) or '.'
+
+        if not os.path.isdir(base_dir) or not os.access(base_dir, os.W_OK):
+            print("Results Filepath Invalid (not accessible or non-existent)")
+            continue
+        else:
+            results_filepath = results_path_input.strip()
+    
+    # Scan Parameters Path
+    params_path_input = input(f"Enter the full filepath of where the scan-settings file should be saved:")
+    if params_path_input.strip():
+        base_dir = os.path.dirname(os.path.abspath(params_path_input)) or '.'
+
+        if not os.path.isdir(base_dir) or not os.access(base_dir, os.W_OK):
+            print("Results Filepath Invalid (not accessible or non-existent)")
+            continue
+        else:
+            parameters_filepath = params_path_input.strip()
+    
     # Axis list
     axis_input = input(f"Enter axis list as comma-separated values (current: {axis_list}) or press Enter to keep: ")
     if axis_input.strip():
@@ -335,8 +343,8 @@ print(f"Time Elapsed for Scan: {end_time-start_time} S")
 ##############################################################################################################################
 
 
-scan_res.save("scan-2x2-delay-tol.json")
-scan_set.save("scan-2x2-delay-tol-settings.json")
+scan_res.save(results_filepath)
+scan_set.save(parameters_filepath)
 
 print("Premi invio per uscire...")
 input()
