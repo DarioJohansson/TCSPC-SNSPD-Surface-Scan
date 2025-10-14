@@ -27,32 +27,10 @@ def time_calculator(scan_settings, count=False, tol=False):
     return result * time_per_grid_point
 
 
-## Let'go:
-
 ########################### Connections section #################################
 
-idq_ip = "149.132.99.103"  # Connection for IDQ
-montana_ip = "149.132.99.104"
-
-########################## Preparation of IDQ TC ################################
-try:
-    timecontroller = TimeController(idq_ip)
-    start_counter = timecontroller.get_counter("start")
-    input1_counter = timecontroller.get_counter(1)
-    input1_tol = timecontroller.get_tol(1)
-
-
-except Exception as e:
-    print(f"Error during preparation of IDQ: {e}")
-
-
-############################# Preparation of Montana ###############################
-try:
-    positioner = Positioner(montana_ip)
-
-except Exception as e:
-    print(f"Error during preparation of Montana: {e}")
-
+idq_ip = None  # Connection for IDQ
+montana_ip = None
 
 ################################ Scan Settings #####################################
 
@@ -101,6 +79,20 @@ while settings_not_applied:
             continue
         else:
             parameters_filepath = params_path_input.strip()
+    
+    # IP Address of Montana CryoPositioner:
+    montana_ip_input = input(f"Enter the IP address of the Montana CryoAdvance-50 device:")
+    if montana_ip_input.strip():
+        montana_ip = montana_ip_input
+    else:
+        print("Input not understood. Retrying")
+
+    # IP Address of IDQuantique TC1000:
+    idq_ip_input = input(f"Enter the IP address of the IDQ TC1000 device:")
+    if idq_ip_input.strip():
+        idq_ip = idq_ip_input
+    else:
+        print("Input not understood. Retrying")
     
     # Axis list
     axis_input = input(f"Enter axis list as comma-separated values (current: {axis_list}) or press Enter to keep: ")
@@ -174,6 +166,10 @@ while settings_not_applied:
 
     # Final confirmation
     print("\nUpdated scan settings:")
+    print(f"Scan Settings Filepath: {parameters_filepath}")
+    print(f"Scan Results Filepath: {results_filepath}")
+    print(f"Montana CryoAdvance-50 IP Address: {montana_ip}")
+    print(f"IDQ TC1000 IP Address: {idq_ip}")
     print(f"  Axes: {axis_list}")
     for axis in axis_list:
         print(f"  Step size {axis}: {scan_set.step_size} m")
@@ -200,7 +196,29 @@ while settings_not_applied:
             print(f"What do you mean by {final_confirmation}?\nLet's try again:")
 
 
-# Applying some settings here.
+########################## Preparation of IDQ TC ################################
+try:
+    timecontroller = TimeController(idq_ip)
+    if timecontroller:
+        start_counter = timecontroller.get_counter("start")
+        input1_counter = timecontroller.get_counter(1)
+        input1_tol = timecontroller.get_tol(1)
+    else:
+        raise Exception("IDQ TC1000 could not initialize. Check Connection.")
+
+except Exception as e:
+    print(f"Error during preparation of IDQ: {e}")
+
+
+############################# Preparation of Montana ###############################
+try:
+    positioner = Positioner(montana_ip)
+
+except Exception as e:
+    print(f"Error during preparation of Montana: {e}")
+
+
+# Applying some settings to the IDQ device here.
 while not timecontroller.threshold(1, input1_threshold) or not timecontroller.threshold("start", start_threshold):
     print("Could not set voltage threshold. Retrying")
     time.sleep(0.5)
@@ -219,13 +237,14 @@ if timecontroller.delay(1, scan_set.tol_delay):
     print(f"Set historgram delay for TOL to {scan_set.tol_delay}")
 
 
+# More data structure initialization 
 
 scan_sequencer = scan_set.initialize_step_sequencer()       # Initializes the sequencer, which is the object calculating the next movement of the positioner.
 
 scan_res = scan_set.initialize_results()                    # Initializes the results, the object in chrge of storing data and saving/loading it to/from file.
 
 
-## defining some functions for the main routine later:
+# defining some functions for the main routine later:
 
 ############################## SCAN ROUTINE DEFINITION ###############################
 
@@ -261,7 +280,7 @@ def measure_tol(step_index_vector: dict, scan_results: ScanResults, acquisition_
     data_obj = tol.acquire(acquisition_time)                                # Hangs for X seconds.
     scan_results.input_data(step_index_vector, data_obj)                    # Inputs the diagram and proceeds
 
-############################### EXIT function, for when things go wrong ################
+############################### EXIT function, for when things go wrong or terminate ################
 
 def exit(signum, frame):
     print(f"Received signal {signum} to stop.")

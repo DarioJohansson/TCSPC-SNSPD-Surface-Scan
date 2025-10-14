@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np
+import os
 from scans.graph_functions import *
 from scans.scan_data_structures import *
 from matplotlib.ticker import FuncFormatter

@@ -90,7 +90,7 @@ class TCCounter:
 
         int_time_response = zmq_exec(self.tc, f"{self.input}:COUN:INTE {int_time_ms}")
         
-        if int_time_response.strip() == f'Value set to {int_time_ms}':
+        if int_time_response.upper().strip() == f'VALUE SET TO {int_time_ms}':
             self.integration_time_ms = int_time_ms
             return True
         
@@ -98,11 +98,12 @@ class TCCounter:
         
    
     def set_count_mode(self, mode: str):
-        if mode.upper() not in ["CYCLE", "ACCUM"]:
+        mode = mode.upper()
+        if mode not in ["CYCLE", "ACCUM"]:
             raise ValueError(f"TCCounter.set_count_mode(): {mode} not a valid count mode.") 
 
-        mode_response = zmq_exec(self.tc, f"{self.input}:COUN:MODE {mode.upper()}")
-        if mode_response.upper().strip() == f'VALUE SET TO {mode.upper()}':
+        mode_response = zmq_exec(self.tc, f"{self.input}:COUN:MODE {mode}")
+        if mode_response.upper().strip() == f'VALUE SET TO {mode}':
             return True
             
         return False

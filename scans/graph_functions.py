@@ -18,13 +18,15 @@ def update_grid_annot(ev,
                       axes
                     ):
     rows, cols = results.data_dims
+  
     if ev.inaxes == _ax:
         if ev.key == "control":
             row = int(round(ev.xdata))
             col = int(round(ev.ydata))
+            index = (row,col)
             if 0 <= row < rows and 0 <= col < cols:
                 annot.xy = (row, col)
-                text = f"{axes[0]}={row_scale_fn(row)} (µm), {axes[1]}={col_scale_fn(col)} (µm)"
+                text = f"{axes[0]}={row_scale_fn(row)} (µm), {axes[1]}={col_scale_fn(col)} (µm)\nPL Frequency: {results.get_data(index, CountData).frequency()}"
                 annot.set_text(text)
                 annot.set_visible(True)
                 _fig.canvas.draw_idle()

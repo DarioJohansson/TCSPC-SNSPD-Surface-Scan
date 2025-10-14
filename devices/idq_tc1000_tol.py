@@ -113,5 +113,5 @@ class TCToL:
         # Get histogram data
         Y_data = literal_eval(zmq_exec(self.connection, f"HIST{self.input}:DATA?"))
         X_data = [i * self.bwidth for i in range(self.bcount)]
-        data_object = ToLData(x_data=X_data, y_data=Y_data)
-        return data_object
+        tol_object = ToLData(x_data=X_data, y_data=Y_data)
+        return tol_object
