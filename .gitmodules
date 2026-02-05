@@ -1,0 +1,3 @@
+[submodule "components/service_config"]
+	path = components/service_config
+	url = https://github.com/DarioJohansson/Python-Service-Config
