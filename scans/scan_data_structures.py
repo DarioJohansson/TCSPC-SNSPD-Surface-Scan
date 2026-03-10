@@ -1,3 +1,5 @@
+from typing import Optional
+from dataclasses import dataclass, field
 import numpy as np
 import sys
 import json
@@ -5,6 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
 from devices.idq_tc1000_counter import * 
 from devices.idq_tc1000_tol import *
+from components.service_config.service_config import ServiceConfig, ConfigurationError
 
 class StepSequencer():
     def __init__(self,
@@ -85,67 +88,35 @@ class StepSequencer():
             return None
         
 
+@dataclass
+class ScanParameters(ServiceConfig):
+    # Required
 
-class ScanParameters:
-    def __init__(
-        self,
-        resolution=None,
-        step_size=None,
-        step_velocity=None,
-        sleep_time=None,
-        filename=None,
-        polling_frequency = None,
-        counter_integration_time = None,
-        tol_acquisition_time = None,
-        error_silent = None,
-        max_positioner_retries = None,
-        tol_bcount = None,
-        tol_bwidth = None,
-        tol_delay = None
-    ):
-        # defaults
-        self.resolution = {"X": 0, "Y": 0, "Z": 0}
-        self.step_size = {"X": 0, "Y": 0, "Z": 0}           # Step size in meters
-        self.step_velocity = None
-        self.polling_frequency = 100
-        self.counter_integration_time = 1000    # ms
-        self.tol_acquisition_time = 60          # s
-        self.sleep_time = 1
-        self.error_silent = True
-        self.filename = None
-        self.max_positioner_retries = 10
-        self.tol_bcount = 100
-        self.tol_bwidth = 100
-        self.tol_delay = 0  # in picoseconds.
+    idq_timetagger_ip: str = None
+    montana_cryoadvance_ip: str = None
 
-    
-        if resolution is not None:
-            self.resolution = resolution
-        if step_size is not None and type(step_size) == dict:
-            self.step_size = {axis: round(value, 9) for axis, value in step_size.items()}
-        if step_velocity is not None:
-            self.step_velocity = round(step_velocity, 6)
-        if polling_frequency is not None:
-            self.polling_frequency = polling_frequency
-        if counter_integration_time is not None:
-            self.counter_integration_time = counter_integration_time
-        if tol_acquisition_time is not None:
-            self.tol_acquisition_time = tol_acquisition_time
-        if sleep_time is not None:
-            self.sleep_time = sleep_time
-        if max_positioner_retries is not None:
-            self.max_positioner_retries = max_positioner_retries
-        if error_silent is not None:
-            self.error_silent = error_silent
-        if filename is not None:
-            self.filename = filename
-        if tol_bcount is not None:
-            self.tol_bcount = tol_bcount
-        if tol_bwidth is not None:
-            self.tol_bwidth = tol_bwidth
-        if tol_delay is not None:
-            self.tol_delay = tol_delay
-        
+    # defaults
+    resolution: dict = field(default_factory=lambda: {"X": 0, "Y": 0, "Z": 0})
+    step_size: dict = field(default_factory=lambda: {"X": 0, "Y": 0, "Z": 0})
+    input_thresholds: dict = field(default_factory=lambda: {
+        "start": -0.3,
+        "1": -0.1,
+        "2": None,
+        "3": None,
+        "4": None
+    })
+         # Step size in meters
+    step_velocity: int = None
+    polling_frequency: int = 100
+    counter_integration_time: int = 1000    # ms
+    tol_acquisition_time: int = 60          # s
+    sleep_time: float = 1.0
+    error_silent: bool = True
+    max_positioner_retries: int = 10
+    tol_bcount: int = 100
+    tol_bwidth: int = 100
+    tol_delay: int = 0  # in picoseconds
+
 
     def initialize_step_sequencer(self):
         return StepSequencer(self.resolution, self.step_size)
@@ -153,27 +124,11 @@ class ScanParameters:
     def initialize_results(self):
         return ScanResults(self.resolution)
     
-    def save(self, path: str):        # function to load params from file            
-        try:
-            with open(path, "w", encoding="utf-8") as f:
-                json.dump(self.__dict__, f, indent=4)
-            self.filename = path
-            return True
-        except Exception as e:
-            # optional: print to stderr for debugging
-            print(f"Error saving ScanParameters to {path}: {e}", file=sys.stderr)
-            return False
+    def axis_list(self):
+        return [axis for axis,value in self.resolution.items() if value > 0]
 
-    @classmethod
-    def load(cls, path: str):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            # unpack dictionary into the constructor
-            return cls(**data)
-        except Exception as e:
-            print(f"Error loading ScanParameters from {path}: {e}", file=sys.stderr)
-            return None
+    def input_list(self):
+        return {input:value for input,value in self.input_thresholds.items() if value != None}
 
 
 class ScanResults:

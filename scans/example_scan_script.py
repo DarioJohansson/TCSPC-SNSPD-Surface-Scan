@@ -1,12 +1,29 @@
-from devices.idq_tc1000_device import *
-from devices.montana_cryoadvance_controls import *
-from scans.scan_data_structures import *
+# Local dependencies
+from devices.idq_tc1000_device import TimeController
+from devices.montana_cryoadvance_controls import Positioner
+from scans.scan_data_structures import ScanParameters, ScanResults, TCCounter, TCToL
+from components.service_config.argparser import build_arg_parser
+from components.service_config.service_config import ServiceConfig
+
+# Packaged Dependencies 
+import tkinter as tk
+from tkinter import filedialog  # File selection prompts.
 import time
 import signal
 import sys
 import os
+from datetime import datetime
+now = datetime.now() # current date and time
 
-## some util functions before we start:
+
+
+DEFAULT_IDQ_IP="149.132.99.103"
+DEFAULT_MONTANA_IP="149.132.99.104"
+
+
+allowed_filetype_extensions = [("JSON", "*.json")]
+
+## some util functions for the scan routine.
 
 def time_calculator(scan_settings, count=False, tol=False):
     time_per_grid_point = scan_settings.sleep_time
@@ -16,8 +33,8 @@ def time_calculator(scan_settings, count=False, tol=False):
         time_per_grid_point += scan_settings.tol_acquisition_time
     
     grid_tuple = tuple(value for value in scan_settings.resolution.values())
-    result = 0
     
+    result = 0
     for i in grid_tuple:  #DIY tuple multiplication
         if result == 0:
             result = i
@@ -27,184 +44,336 @@ def time_calculator(scan_settings, count=False, tol=False):
     return result * time_per_grid_point
 
 
-########################### Connections section #################################
+def select_directory(msg: str = "Select a directory") -> str:
+    # Hide the root window
+    root = tk.Tk()
+    root.withdraw()
 
-idq_ip = None  # Connection for IDQ
-montana_ip = None
+    try:
+        # Open directory selection dialog
+        directory = filedialog.askdirectory(
+            title=msg
+        )
 
-################################ Scan Settings #####################################
+        if directory:
+            root.destroy()
+            return directory
 
-scan_set = ScanParameters()
-results_filepath = None
-parameters_filepath = None
-# Default values
-axis_list = ["Y", "Z"]            
-scan_set.step_size["Z"] = 0.00001   # metres
-scan_set.step_size["Y"] = 0.00001   # metres
-scan_set.resolution["Z"] = 60
-scan_set.resolution["Y"] = 60
-scan_set.counter_integration_time = 200 # ms
-scan_set.tol_acquisition_time = 30      # s
-scan_set.tol_bcount = 1000
-scan_set.tol_bwidth = 1000
-scan_set.tol_delay = 1400000
-scan_set.sleep_time = 0
-scan_started = False
-settings_not_applied=True
-input1_threshold = -0.1
-start_threshold = -0.3
+        else:
+            print("No directory selected.")
+            root.destroy()
+            return ""
+        
+    except Exception as e:
+        print(e)
+        root.destroy()
+
+    
+
+def select_file(msg: str = "Select a file") -> str:
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
 
 
-# --- USER PROMPTS ---
+    try:
+        file_path = filedialog.askopenfilename(
+            title=msg,
+            filetypes=allowed_filetype_extensions
+        )
 
-while settings_not_applied:
-    # Scan Results Path
-    results_path_input = input(f"Enter the full filepath of where the results file should be saved:")
-    if results_path_input.strip():
-        base_dir = os.path.dirname(os.path.abspath(results_path_input)) or '.'
+        if file_path:
+            root.destroy()
+            return file_path
+        else:
+            print("No file selected.")
+            root.destroy()
+            return ""
+    
+    except Exception as e:
+        print(e)
+        root.destroy()
+
+    
+def new_file(msg: str = "Choose new file") -> str:
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
+
+
+    try:
+        file_path = filedialog.asksaveasfile(
+            title=msg,
+            filetypes=allowed_filetype_extensions
+        )
+
+        if file_path:
+            root.destroy()
+            return file_path
+        else:
+            print("No file selected.")
+            root.destroy()
+            return ""
+    
+    except Exception as e:
+        print(e)
+        root.destroy()
+
+    
+# Function which emits a tuple of strings representing respectively the results save file path and the parameters save file path from a base save directory.
+# It interactively asks for a save dir if none is given.
+# It returns None if the directory cannot be written to or the files in the dir already exist.
+
+def save_file_paths(save_config_path: str = None, save_name: str = None) -> tuple[str] | None:
+    
+    if save_name is None:
+        save_name = now.strftime("%m-%d-%Y--%H-%M-%S") + "-PLMap"
+    
+    if save_config_path is None:
+        while True:
+            save_config_path = select_directory()
+            if os.access(save_config_path, os.W_OK):
+                break
+            print("Directory not accessible, try again.")
+
+    if save_name.strip():          ## Also checks if the name string is nonempty
+        base_dir = os.path.dirname(os.path.abspath(save_config_path)) or '.'
 
         if not os.path.isdir(base_dir) or not os.access(base_dir, os.W_OK):
-            print("Results Filepath Invalid (not accessible or non-existent)")
-            continue
-        else:
-            results_filepath = results_path_input.strip()
-    
-    # Scan Parameters Path
-    params_path_input = input(f"Enter the full filepath of where the scan-settings file should be saved:")
-    if params_path_input.strip():
-        base_dir = os.path.dirname(os.path.abspath(params_path_input)) or '.'
+            print(f"Filepath '{save_config_path}' invalid (not accessible or non-existent)")
+            sys.exit(1)
 
-        if not os.path.isdir(base_dir) or not os.access(base_dir, os.W_OK):
-            print("Results Filepath Invalid (not accessible or non-existent)")
-            continue
-        else:
-            parameters_filepath = params_path_input.strip()
+        results_filename = os.path.join(save_config_path, save_name + "_results.json")
+        parameters_filename = os.path.join(save_config_path, save_name + "_parameters.json")
     
-    # IP Address of Montana CryoPositioner:
-    montana_ip_input = input(f"Enter the IP address of the Montana CryoAdvance-50 device:")
-    if montana_ip_input.strip():
-        montana_ip = montana_ip_input
+        if os.path.exists(results_filename):
+            print(f"The file {results_filename} already exists. Choose another name.")
+            return None
+        if os.path.exists(parameters_filename):
+            print(f"The file {parameters_filename} already exists. Choose another name.")
+            return None
+        
+        return (parameters_filename, results_filename)
+    
+
+    
+
+
+def interactive_prompt() -> ScanParameters:
+    interactive_prompt = True
+    parameters = ScanParameters()
+    
+    while interactive_prompt:
+
+        # Device IP Addresses:
+        idq_ip_input = input(f"Input the IP address of the IDQ Time Tagger device or press Enter to keep {DEFAULT_IDQ_IP}: ")
+        montaina_ip_input = input(f"Input the IP address of the Montana CryoAdvance device or press Enter to keep {DEFAULT_MONTANA_IP}: ")
+
+        if idq_ip_input.strip():
+            parameters.idq_timetagger_ip = idq_ip_input
+        else:
+            parameters.idq_timetagger_ip = DEFAULT_IDQ_IP
+
+        if montaina_ip_input.strip():
+             parameters.montana_cryoadvance_ip = montaina_ip_input
+        else:
+            parameters.montana_cryoadvance_ip = DEFAULT_MONTANA_IP
+
+        # Resolution for each axis              
+        for axis in ["X", "Y", "Z"]:
+            res_input = input(f"Enter resolution (number of steps) for axis {axis}. Set to 0 to disable axis:  ")
+            if res_input.strip():
+                parameters.resolution[axis] = int(res_input)
+
+        print(f"DEBUG: axes: {parameters.resolution}")
+
+        # Step size for each axis
+        for axis in parameters.axis_list():
+            current_step = parameters.step_size.get(axis, 0.0)
+            step_input = input(f"Enter step size for axis {axis} in metres (current: {current_step}): ")
+            if step_input.strip():
+                parameters.step_size[axis] = float(step_input)
+
+        # Counter integration time
+        cit_input = input(f"Enter counter integration time in ms (current: {parameters.counter_integration_time}): ")
+        if cit_input.strip():
+            parameters.counter_integration_time = int(cit_input)
+
+        # Tolerances
+        acq_time_input = input(f"Enter time-of-life acquisition time in seconds (current: {parameters.tol_acquisition_time}): ")
+        if acq_time_input.strip():
+            parameters.tol_acquisition_time = int(acq_time_input)
+
+        bcount_input = input(f"Enter time-of-life bin count (current: {parameters.tol_bcount}): ")
+        if bcount_input.strip():
+            parameters.tol_bcount = int(bcount_input)
+
+        bwidth_input = input(f"Enter time-of-life bin width in ps (current: {parameters.tol_bwidth}): ")
+        if bwidth_input.strip():
+            parameters.tol_bwidth = int(bwidth_input)
+
+        delay_input = input(f"Enter time-of-life bin delay in ps (current: {parameters.tol_delay}): ")
+        if delay_input.strip():
+            parameters.tol_delay = int(delay_input)
+
+        # Sleep time
+        sleep_input = input(f"Enter additional sleep time for each step in seconds (current: {parameters.sleep_time}): ")
+        if sleep_input.strip():
+            parameters.sleep_time = float(sleep_input)
+
+        
+        # Input list. Defines which input is active in the receptikon of photons from the samples. START trigger channel is on by default with a threshold of -0.3.
+        # The user can select the remaining input channel or leave default at "1"
+
+        tagger_input = input(f"Enter the input channel number (default: 1): ")
+        
+        if tagger_input.strip():
+            if tagger_input in parameters.input_thresholds.keys() and tagger_input != "start":
+                
+                # Zeroing the values
+                for channel in parameters.input_thresholds.keys():
+                    if channel != "start":
+                        parameters.input_thresholds[channel] = None
+                
+                # Setting the value at the determined input channel.
+                parameters.input_thresholds[tagger_input] = -0.1
+
+            else:
+                print("Input channel invalid.") # Case where the channel string is not an expected value.
+        
+        
+        for channel,value in parameters.input_list().items():
+
+            threshold_input = input(f"Enter voltage threshold for input signal detection on channel {channel} (current: {value}): ")
+            try:
+                if threshold_input.strip():
+                    parameters.input_thresholds[channel] = float(threshold_input.strip())
+            except Exception as e:
+                print(f"Input is invalid. More details: {e}\n Try Again.")
+            
+
+        # Final confirmation
+        print("\nUpdated scan settings:")
+        
+        print(f"  Time Tagger IP Address: {parameters.idq_timetagger_ip}")
+        print(f"  Montana CryoAdvance IP Address: {parameters.montana_cryoadvance_ip}")
+        print(f"  Active Axes: {parameters.axis_list()}")
+        print(f"  Step size {axis}: {parameters.step_size} m")
+        print(f"  Resolution {axis}: {parameters.resolution}")
+        print(f"  Counter integration time: {parameters.counter_integration_time} ms")
+        print(f"  Acquisition time tolerance: {parameters.tol_acquisition_time} s")
+        print(f"  Beam count tolerance: {parameters.tol_bcount}")
+        print(f"  Beam width tolerance: {parameters.tol_bwidth}")
+        print(f"  Delay tolerance: {parameters.tol_delay} ms")
+        print(f"  Sleep time: {parameters.sleep_time} s")
+        
+        for channel,value in parameters.input_list().items():
+            print(f"  Voltage Threshold on Time Tagger for channel {channel}: {value} V")
+
+        print("\n\n")
+        
+        while True:
+            final_confirmation = input("Do these settings look good? y/n/abort\n")
+            if final_confirmation in ['y','Y','yes','si']:
+                interactive_prompt = False
+                break
+            elif final_confirmation in ['n', 'N', 'no']:
+                break
+            elif final_confirmation in ['abort', 'ABORT']:
+                exit()
+            else:
+                print(f"What do you mean by {final_confirmation}?\nLet's try again:")
+
+    return parameters
+
+
+
+#################################################################################
+
+###################### Case Switch for User Interaction #########################
+
+
+
+parser = build_arg_parser()
+args = parser.parse_args()
+scan_set = None
+
+
+if args.config_from_file is not None:
+
+    if args.config_from_file is not False:
+        path = args.config_from_file
+        if not os.access(path, os.R_OK):
+            print(f"Error: filepath {path} doesn't exist or unreadable.")
+            sys.exit(1)
+
     else:
-        print("Input not understood. Retrying")
+        input("Press enter to select configuration file interactively...")
+        path = select_directory()
+    
+    scan_set = ScanParameters.from_json(path=path)
+    
 
-    # IP Address of IDQuantique TC1000:
-    idq_ip_input = input(f"Enter the IP address of the IDQ TC1000 device:")
-    if idq_ip_input.strip():
-        idq_ip = idq_ip_input
+
+elif args.save_config is not None:
+    
+    if args.save_config is not False:
+        
+        try:
+
+            scan_set : ScanParameters = interactive_prompt()
+            path = args.save_config
+            parent = os.path.dirname(path)
+            if os.access(parent, os.W_OK | os.X_OK) and os.path.isdir(parent):
+                print("Saving config to following path:")
+                print(path)
+                scan_set.to_json(path)
+                sys.exit(0)
+            else:
+                print("Path to save configuration is not accessible:")
+                print(f"Path: {path}")
+                sys.exit(1)
+        
+        except Exception as e:
+            print("Something went wrong while saving config to file. Aborting.")
+            print(e)
+            sys.exit(1)
+
     else:
-        print("Input not understood. Retrying")
+
+        print("Select path to save configuration...")
+        filepath = new_file(msg="Saving configuration file")
+
+        
+        try:
+            scan_set : ScanParameters = interactive_prompt()
+            parent = os.path.dirname(filepath)
+            if os.access(parent, os.W_OK | os.X_OK) and os.path.isdir(parent):
+                print("Saving config to following path:")
+                print(filepath)
+                scan_set.to_json(filepath)
+                sys.exit(0)
+            else:
+                print("Path to save configuration is not accessible:")
+                print(f"Path: {filepath}")
+                sys.exit(1)
+        
+        except Exception as e:
+            print("Something went wrong while saving config to file. Aborting.")
+            print(e)
+        
+else:
     
-    # Axis list
-    axis_input = input(f"Enter axis list as comma-separated values (current: {axis_list}) or press Enter to keep: ")
-    if axis_input.strip():
-        axis_list = [axis.strip().upper() for axis in axis_input.split(",")]
-        if len(axis_list) == 0:
-            print("Not enough axes supplied.")
-            continue
-    # Step size for each axis
-    for axis in axis_list:
-        current_step = scan_set.step_size.get(axis, 0.0)
-        step_input = input(f"Enter step size for axis {axis} in metres (current: {current_step}): ")
-        if step_input.strip():
-            scan_set.step_size[axis] = float(step_input)
+    scan_set: ScanParameters = interactive_prompt()        
 
-    for axis in scan_set.step_size.keys():
-        if axis not in axis_list:
-            scan_set.step_size[axis] = 0
-
-    # Resolution for each axis
-    for axis in axis_list:
-        current_res = scan_set.resolution.get(axis, 0)
-        res_input = input(f"Enter resolution (number of steps) for axis {axis} (current: {current_res}): ")
-        if res_input.strip():
-            scan_set.resolution[axis] = int(res_input)
-
-    for axis in scan_set.resolution.keys():
-        if axis not in axis_list:
-            scan_set.resolution[axis] = 0
-
-    # Counter integration time
-    cit_input = input(f"Enter counter integration time in ms (current: {scan_set.counter_integration_time}): ")
-    if cit_input.strip():
-        scan_set.counter_integration_time = int(cit_input)
-
-    # Tolerances
-    acq_time_input = input(f"Enter time-of-life acquisition time in seconds (current: {scan_set.tol_acquisition_time}): ")
-    if acq_time_input.strip():
-        scan_set.tol_acquisition_time = int(acq_time_input)
-
-    bcount_input = input(f"Enter time-of-life bin count (current: {scan_set.tol_bcount}): ")
-    if bcount_input.strip():
-        scan_set.tol_bcount = int(bcount_input)
-
-    bwidth_input = input(f"Enter time-of-life bin width in ps (current: {scan_set.tol_bwidth}): ")
-    if bwidth_input.strip():
-        scan_set.tol_bwidth = int(bwidth_input)
-
-    delay_input = input(f"Enter time-of-life bin delay in ps (current: {scan_set.tol_delay}): ")
-    if delay_input.strip():
-        scan_set.tol_delay = int(delay_input)
-
-    # Sleep time
-    sleep_input = input(f"Enter additional sleep time for each step in seconds (current: {scan_set.sleep_time}): ")
-    if sleep_input.strip():
-        scan_set.sleep_time = float(sleep_input)
-
-    threshold_input = input(f"Enter voltage threshold for input signal detection on START (current: {start_threshold}): ")
-    try:
-        if threshold_input != '':
-            start_threshold = float(threshold_input.strip())
-    except Exception as e:
-        print(f"Input is not a number. More details: {e}\n Try Again later.")
-    
-    threshold_input = input(f"Enter voltage threshold for input signal detection on channel 1 (current: {input1_threshold}): ") 
-    try:
-        if threshold_input != '':
-            input1_threshold = float(threshold_input.strip())
-    except Exception as e:
-        print(f"Input is not a number. More details: {e}\n Try Again later.")
-
-    # Final confirmation
-    print("\nUpdated scan settings:")
-    print(f"Scan Settings Filepath: {parameters_filepath}")
-    print(f"Scan Results Filepath: {results_filepath}")
-    print(f"Montana CryoAdvance-50 IP Address: {montana_ip}")
-    print(f"IDQ TC1000 IP Address: {idq_ip}")
-    print(f"  Axes: {axis_list}")
-    for axis in axis_list:
-        print(f"  Step size {axis}: {scan_set.step_size} m")
-        print(f"  Resolution {axis}: {scan_set.resolution}")
-    print(f"  Counter integration time: {scan_set.counter_integration_time} ms")
-    print(f"  Acquisition time tolerance: {scan_set.tol_acquisition_time} s")
-    print(f"  Beam count tolerance: {scan_set.tol_bcount}")
-    print(f"  Beam width tolerance: {scan_set.tol_bwidth}")
-    print(f"  Delay tolerance: {scan_set.tol_delay} ms")
-    print(f"  Sleep time: {scan_set.sleep_time} s")
-    print(f"  Thresholds for START and INPUT1: {start_threshold} V - {input1_threshold} V")
-    print("\n\n")
-    
-    while True:
-        final_confirmation = input("Do these settings look good? y/n/abort\n")
-        if final_confirmation in ['y','Y','yes','si']:
-            settings_not_applied = False
-            break
-        elif final_confirmation in ['n', 'N', 'no']:
-            break
-        elif final_confirmation in ['abort', 'ABORT']:
-            exit()
-        else:
-            print(f"What do you mean by {final_confirmation}?\nLet's try again:")
 
 
 ########################## Preparation of IDQ TC ################################
+
 try:
-    timecontroller = TimeController(idq_ip)
-    if timecontroller:
-        start_counter = timecontroller.get_counter("start")
-        input1_counter = timecontroller.get_counter(1)
-        input1_tol = timecontroller.get_tol(1)
-    else:
-        raise Exception("IDQ TC1000 could not initialize. Check Connection.")
+    timecontroller = TimeController(scan_set.idq_timetagger_ip)
+    start_counter = timecontroller.get_counter("start")
+    input1_counter = timecontroller.get_counter(1)
+    input1_tol = timecontroller.get_tol(1)
+
 
 except Exception as e:
     print(f"Error during preparation of IDQ: {e}")
@@ -212,19 +381,35 @@ except Exception as e:
 
 ############################# Preparation of Montana ###############################
 try:
-    positioner = Positioner(montana_ip)
+    positioner = Positioner(scan_set.montana_cryoadvance_ip)
 
 except Exception as e:
     print(f"Error during preparation of Montana: {e}")
 
 
-# Applying some settings to the IDQ device here.
-while not timecontroller.threshold(1, input1_threshold) or not timecontroller.threshold("start", start_threshold):
-    print("Could not set voltage threshold. Retrying")
-    time.sleep(0.5)
 
-for i in ["start", 1]:
-    timecontroller.enable_input(i)
+
+
+####################################################################################       Configuration stage is over. Now settings will be applied.
+############################# Apply Scan Settings ###############################
+
+
+results_filepath = None
+parameters_filepath = None
+
+
+# Applying some settings here.
+for input,value in scan_set.input_list().items():
+
+    while not timecontroller.threshold(input, value):
+        print("Could not set voltage threshold. Retrying")
+        time.sleep(0.5)
+        
+    if timecontroller.enable_input(input):
+        print(f"Enabled input {input} on timetagger.")
+    else:
+        print(f"Could not enable input {input} on timetagger. Consider aborting operation.")
+
 
 print(f'Threshold on Start: {timecontroller.threshold("start")}\nThreshold on Input 1: {timecontroller.threshold(1)}\n')
 
@@ -285,7 +470,7 @@ def measure_tol(step_index_vector: dict, scan_results: ScanResults, acquisition_
 def exit(signum, frame):
     print(f"Received signal {signum} to stop.")
     if scan_started:
-        for axis in axis_list:
+        for axis in scan_set.axis_list():
             print(f"Stopping positioner {axis}")
             positioner.stop(axis)
         for i in ["start", 1]:
@@ -313,7 +498,7 @@ scan_started = True
 start_time = time.time()
 
 ## ZEROING ALL POSITIONER AXES 
-for axis in axis_list:
+for axis in scan_set.axis_list():
     while not positioner.zero_position(axis):
         positioner.zero_position(axis)
         time.sleep(0.25)
@@ -326,7 +511,7 @@ for axis in axis_list:
 # this will be then ovveridden by the next_step_in_Sequence method by
 # the sequencer each new iteration.
 
-index_vector = {axis: 0 for axis in axis_list}
+index_vector = {axis: 0 for axis in scan_set.axis_list()}
 
 ################################################### MAIN LOOP LOGIC ####################################################
 while True:
@@ -363,7 +548,7 @@ print(f"Time Elapsed for Scan: {end_time-start_time} S")
 
 
 scan_res.save(results_filepath)
-scan_set.save(parameters_filepath)
+scan_set.to_json(parameters_filepath)
 
 print("Premi invio per uscire...")
 input()
