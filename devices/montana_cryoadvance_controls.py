@@ -161,7 +161,7 @@ class Positioner:
         
         position = format(position, '.17f')
         response = requests.post(f"{self.axis_url[axis]}/methods/moveAbsolute(double:pos)", data=position, headers={"Content-Type": "text/plain"})
-        time.sleep(self._time_of_travel(axis, position))        
+        time.sleep(self._time_of_travel(axis, int(position)))       
         return response.status_code == 200
 
     def zero_position(self, axis: str = '') -> bool:
