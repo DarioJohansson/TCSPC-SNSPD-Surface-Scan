@@ -307,7 +307,7 @@ if args.config_from_file is not None:
 
     else:
         input("Press enter to select configuration file interactively...")
-        path = select_directory()
+        path = select_file()
     
     scan_set = ScanParameters.from_json(path=path)
     
