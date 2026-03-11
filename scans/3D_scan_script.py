@@ -12,14 +12,16 @@ import time
 import signal
 import sys
 import os
+import builtins
 from datetime import datetime
 now = datetime.now() # current date and time
 
 
 
-DEFAULT_IDQ_IP="149.132.99.103"
-DEFAULT_MONTANA_IP="149.132.99.104"
-
+DEFAULT_IDQ_IP="169.254.207.101"
+DEFAULT_MONTANA_IP="192.168.1.2"
+results_filepath = None
+parameters_filepath = None
 
 allowed_filetype_extensions = [("JSON", "*.json")]
 
@@ -100,7 +102,7 @@ def new_file(msg: str = "Choose new file") -> str:
 
 
     try:
-        file_path = filedialog.asksaveasfile(
+        file_path = filedialog.asksaveasfilename(
             title=msg,
             filetypes=allowed_filetype_extensions
         )
@@ -122,14 +124,13 @@ def new_file(msg: str = "Choose new file") -> str:
 # It interactively asks for a save dir if none is given.
 # It returns None if the directory cannot be written to or the files in the dir already exist.
 
-def save_file_paths(save_config_path: str = None, save_name: str = None) -> tuple[str] | None:
+def results_file_path(save_config_path: str = None, msg: str = "Select Directory to Save Results") -> str | None:
     
-    if save_name is None:
-        save_name = now.strftime("%m-%d-%Y--%H-%M-%S") + "-PLMap"
+    save_name = now.strftime("%m-%d-%Y--%H-%M-%S") + "-PLMap"
     
     if save_config_path is None:
         while True:
-            save_config_path = select_directory()
+            save_config_path = select_directory(msg=msg)
             if os.access(save_config_path, os.W_OK):
                 break
             print("Directory not accessible, try again.")
@@ -142,16 +143,14 @@ def save_file_paths(save_config_path: str = None, save_name: str = None) -> tupl
             sys.exit(1)
 
         results_filename = os.path.join(save_config_path, save_name + "_results.json")
-        parameters_filename = os.path.join(save_config_path, save_name + "_parameters.json")
+        
     
         if os.path.exists(results_filename):
-            print(f"The file {results_filename} already exists. Choose another name.")
+            print(f"The file {results_filename} already exists.")
             return None
-        if os.path.exists(parameters_filename):
-            print(f"The file {parameters_filename} already exists. Choose another name.")
-            return None
+
         
-        return (parameters_filename, results_filename)
+        return results_filename
     
 
     
@@ -198,21 +197,22 @@ def interactive_prompt() -> ScanParameters:
             parameters.counter_integration_time = int(cit_input)
 
         # Tolerances
-        acq_time_input = input(f"Enter time-of-life acquisition time in seconds (current: {parameters.tol_acquisition_time}): ")
+        acq_time_input = input(f"Enter TRPL acquisition time in seconds  (set to 0 to disable TRPL) (current: {parameters.tol_acquisition_time}): ")
         if acq_time_input.strip():
             parameters.tol_acquisition_time = int(acq_time_input)
 
-        bcount_input = input(f"Enter time-of-life bin count (current: {parameters.tol_bcount}): ")
-        if bcount_input.strip():
-            parameters.tol_bcount = int(bcount_input)
+        if parameters.tol_acquisition_time > 0:
+            bcount_input = input(f"Enter TRPL bin count (current: {parameters.tol_bcount}): ")
+            if bcount_input.strip():
+                parameters.tol_bcount = int(bcount_input)
 
-        bwidth_input = input(f"Enter time-of-life bin width in ps (current: {parameters.tol_bwidth}): ")
-        if bwidth_input.strip():
-            parameters.tol_bwidth = int(bwidth_input)
+            bwidth_input = input(f"Enter TRPL bin width in ps (current: {parameters.tol_bwidth}): ")
+            if bwidth_input.strip():
+                parameters.tol_bwidth = int(bwidth_input)
 
-        delay_input = input(f"Enter time-of-life bin delay in ps (current: {parameters.tol_delay}): ")
-        if delay_input.strip():
-            parameters.tol_delay = int(delay_input)
+            delay_input = input(f"Enter TRPL bin delay in ps (current: {parameters.tol_delay}): ")
+            if delay_input.strip():
+                parameters.tol_delay = int(delay_input)
 
         # Sleep time
         sleep_input = input(f"Enter additional sleep time for each step in seconds (current: {parameters.sleep_time}): ")
@@ -259,11 +259,11 @@ def interactive_prompt() -> ScanParameters:
         print(f"  Step size {axis}: {parameters.step_size} m")
         print(f"  Resolution {axis}: {parameters.resolution}")
         print(f"  Counter integration time: {parameters.counter_integration_time} ms")
-        print(f"  Acquisition time tolerance: {parameters.tol_acquisition_time} s")
-        print(f"  Beam count tolerance: {parameters.tol_bcount}")
-        print(f"  Beam width tolerance: {parameters.tol_bwidth}")
-        print(f"  Delay tolerance: {parameters.tol_delay} ms")
-        print(f"  Sleep time: {parameters.sleep_time} s")
+        print(f"  TRPL Acquisition time (s): {parameters.tol_acquisition_time}")
+        print(f"  TRPL Bin count: {parameters.tol_bcount}")
+        print(f"  TRPL Bin width (ps): {parameters.tol_bwidth}")
+        print(f"  TRPL Delay (ps): {parameters.tol_delay}")
+        print(f"  Sleep time (s): {parameters.sleep_time}")
         
         for channel,value in parameters.input_list().items():
             print(f"  Voltage Threshold on Time Tagger for channel {channel}: {value} V")
@@ -341,7 +341,6 @@ elif args.save_config is not None:
 
         print("Select path to save configuration...")
         filepath = new_file(msg="Saving configuration file")
-
         
         try:
             scan_set : ScanParameters = interactive_prompt()
@@ -365,6 +364,10 @@ else:
     scan_set: ScanParameters = interactive_prompt()        
 
 
+## Defining save path for results:
+
+print("Select a directory to save results:")
+results_filepath = results_file_path()
 
 ########################## Preparation of IDQ TC ################################
 
@@ -393,9 +396,6 @@ except Exception as e:
 ####################################################################################       Configuration stage is over. Now settings will be applied.
 ############################# Apply Scan Settings ###############################
 
-
-results_filepath = None
-parameters_filepath = None
 
 
 # Applying some settings here.
@@ -462,6 +462,7 @@ def measure_frequency(step_index_vector: dict, scan_results: ScanResults, counte
 
 ############################### ToL MEASUREMENT FUNCTION ###############################
 def measure_tol(step_index_vector: dict, scan_results: ScanResults, acquisition_time: int, tol: TCToL):
+
     data_obj = tol.acquire(acquisition_time)                                # Hangs for X seconds.
     scan_results.input_data(step_index_vector, data_obj)                    # Inputs the diagram and proceeds
 
@@ -491,7 +492,7 @@ signal.signal(signal.SIGTERM, exit)  # kill <pid>
 
 print(f"Tempo presvisto per scansione: {round(time_calculator(scan_set, count=True)/60, 1)} minuti.")
 print("Tutto pronto. Premi invio...")
-input()
+ignore = builtins.input()
 
 
 scan_started = True
@@ -519,10 +520,12 @@ while True:
     print(f"Current Position Index: {index_vector}")
 
     # Measurement stage:
-    print("Measuring photon incidence freq:")
-    measure_frequency(index_vector, scan_res, input1_counter)
-    print(f"Measuring photon ToL for {scan_set.tol_acquisition_time} seconds:")
-    measure_tol(index_vector, scan_res, scan_set.tol_acquisition_time, input1_tol)
+    if scan_set.counter_integration_time > 0:
+        print("Measuring photon incidence freq:")
+        measure_frequency(index_vector, scan_res, input1_counter)
+    if scan_set.tol_acquisition_time > 0:
+        print(f"Measuring photon ToL for {scan_set.tol_acquisition_time} seconds:")
+        measure_tol(index_vector, scan_res, scan_set.tol_acquisition_time, input1_tol)
     
     next = scan_sequencer.next_step_in_sequence()
     
@@ -542,6 +545,7 @@ while True:
 
     time.sleep(scan_set.sleep_time)   # Another optional sleep margin, although not necessary.
 
+
 end_time=time.time()
 print(f"Time Elapsed for Scan: {end_time-start_time} S")
 ##############################################################################################################################
@@ -551,6 +555,6 @@ scan_res.save(results_filepath)
 scan_set.to_json(parameters_filepath)
 
 print("Premi invio per uscire...")
-input()
+builtins.input()
 exit()
 
