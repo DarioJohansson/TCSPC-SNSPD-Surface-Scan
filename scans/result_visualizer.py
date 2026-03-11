@@ -169,7 +169,7 @@ if __name__ == "__main__":
 
         
     results = ScanResults.load(results_filepath)
-    settings = ScanParameters.load(parameters_filepath)
+    settings = ScanParameters.from_json(parameters_filepath)
     if len(results.data_dims) == 1:
         interactive_1D_graph(results,settings)
     elif len(results.data_dims) == 2:
