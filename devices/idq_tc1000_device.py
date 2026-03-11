@@ -86,9 +86,13 @@ class TimeController:
         elif type(input) == str and input.upper() == "START":
             return "STAR"
         elif type(input) == str and input.upper() != "START":
-            raise ValueError(f"TimeController._input_channel_parser(): \"{input}\" is not a valid input channel.")
+            if input.isdigit():
+                if int(input) in range (1,5):
+                    return f"INPU{input}"
+
         else:
             return f"INPU{input}"
+
         
     
     def delay(self, input: int|str, delay: int = None) -> int|bool:  ## in picoseconds
