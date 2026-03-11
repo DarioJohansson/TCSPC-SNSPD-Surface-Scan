@@ -470,13 +470,13 @@ def measure_tol(step_index_vector: dict, scan_results: ScanResults, acquisition_
 
 def exit(signum, frame):
     print(f"Received signal {signum} to stop.")
-    if scan_started:
-        for axis in scan_set.axis_list():
-            print(f"Stopping positioner {axis}")
-            positioner.stop(axis)
-        for i in ["start", 1]:
-            print(f"Disabling timecontroller input {i}")
-            timecontroller.disable_input(i)
+
+    for axis in scan_set.axis_list():
+        print(f"Stopping positioner {axis}")
+        positioner.stop(axis)
+    for i in ["start", 1]:
+        print(f"Disabling timecontroller input {i}")
+        timecontroller.disable_input(i)
         
     sys.exit(0)
 
