@@ -8,20 +8,24 @@ from matplotlib.ticker import MultipleLocator
 from devices.idq_tc1000_counter import * 
 from devices.idq_tc1000_tol import *
 from components.service_config.service_config import ServiceConfig, ConfigurationError
+from scans.scan_patterns import raster_sequence, snake_sequence
 
 class StepSequencer():
     def __init__(self,
         resolution=None,
         step_size=None,
+        type="raster",
         ):
         if not resolution and not step_size:
             raise ValueError("StepSequencer.__init__(): resolution or step size empty or wrong format.")
         
+        self.scan_type = type
         self.resolution = resolution
         self.step_size = step_size
         self.step_matrix = {}
         self.step_counter = {}
         self.active_axes = ()
+        self.direction = {}
         self.position = {}
         self._initialize_step_matrix()
 
@@ -46,11 +50,16 @@ class StepSequencer():
             self.position.update({axis: 0})
             self.step_matrix.update({axis: []})
             self.step_counter.update({axis: 0})
+            self.direction.update({axis: 1})
             for i in range(0, self.resolution[axis]):
                 self.step_matrix[axis].append(round(i * self.step_size[axis], 9))           # Result of this will be a step matrix like so: {"Y": [steps], "Z": [steps]} if X resolution was left 0.
 
+    
+    
     def next_step_in_sequence(self) -> tuple[dict, list[dict]]|None:
         
+        old_position_vector = self.position
+
         def diff_positions(old: dict, new: dict) -> list:
             changes = []
             for key, new_value in new.items():
@@ -58,19 +67,19 @@ class StepSequencer():
                 if old_value != new_value:
                     changes.append({"axis": key, "position": new_value})
             return changes
+                     
         
-        old_position_vector = self.position
+        ######## Initial calculation condition
 
-        # Next Step Index calculation        
-        if self.step_counter != {axis: self.resolution[axis] - 1 for axis in self.active_axes}:
-            for axis, value in self.step_counter.items():       ## Algorithm iterations: 4 works correctly now, finally
-                if value < self.resolution[axis] - 1:
-                    self.step_counter[axis] += 1
-                    break
-                else:
-                    self.step_counter[axis] = 0
+        if self.step_counter != {axis: self.resolution[axis] - 1 for axis in self.active_axes}:     ## checks if the current position dict is dissimilar from the final position dict, where all axes are at res - 1 in position
+            
+            if self.scan_type == "raster":
+                raster_sequence(self.step_counter, self.resolution)
+            elif self.scan_type == "snake":
+                snake_sequence(self.step_counter, self.resolution, self.direction)
+            
 
-            # Now convert indexes to positions via the step size matrix 
+            # Index conversion to real measurements. 
             new_position_vector = {axis: round(self.step_counter[axis] * self.step_size[axis], 9) for axis in self.active_axes}
             self.position = new_position_vector
             index_vector = self.step_counter
@@ -81,12 +90,16 @@ class StepSequencer():
                                                                     # index vector is used by data input functions to put data in the right matrix slots
                                                                     # and instructions are interpreted by the positioner motion function.
         
+        ######### Final cleanup and return None
         
-        else:           # once scan is over, the sequences flips it's flag and outside functions can tell the sequence is over, to stop looping.
+        else:         # once scan is over, the sequences flips it's flag and outside functions can tell the sequence is over, to stop looping.
             self.step_counter = {axis: 0 for axis in self.active_axes}
             self.position = self.step_counter
             return None
         
+    
+       
+                    
 
 @dataclass
 class ScanParameters(ServiceConfig):
