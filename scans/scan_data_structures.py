@@ -130,7 +130,7 @@ class ScanParameters(ServiceConfig):
         "4": None
     })
          # Step size in meters
-    step_velocity: int = None
+    step_velocity: dict[float] = None
     polling_frequency: int = 100
     counter_integration_time: int = 1000    # ms
     tol_acquisition_time: int = 60          # s

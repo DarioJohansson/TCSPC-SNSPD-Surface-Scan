@@ -97,7 +97,7 @@ def select_file(msg: str = "Select a file") -> str:
         root.destroy()
 
     
-def new_file(msg: str = "Choose new file") -> str:
+def new_file(msg: str = "Choose new file", filename=None) -> str:
     root = tk.Tk()
     root.withdraw()  # Hide the main window
 
@@ -105,7 +105,9 @@ def new_file(msg: str = "Choose new file") -> str:
     try:
         file_path = filedialog.asksaveasfilename(
             title=msg,
-            filetypes=allowed_filetype_extensions
+            initialfile=filename,
+            filetypes=allowed_filetype_extensions,
+            defaultextension=".json"
         )
 
         if file_path:
@@ -130,28 +132,23 @@ def results_file_path(save_config_path: str = None, msg: str = "Select Directory
     save_name = now.strftime("%m-%d-%Y--%H-%M-%S") + "-PLMap"
     
     if save_config_path is None:
-        while True:
-            save_config_path = select_directory(msg=msg)
-            if os.access(save_config_path, os.W_OK):
-                break
-            print("Directory not accessible, try again.")
 
-    if save_name.strip():          ## Also checks if the name string is nonempty
-        base_dir = os.path.dirname(os.path.abspath(save_config_path)) or '.'
+        save_config_path = new_file(msg=msg, filename=save_name)
 
-        if not os.path.isdir(base_dir) or not os.access(base_dir, os.W_OK):
-            print(f"Filepath '{save_config_path}' invalid (not accessible or non-existent)")
-            sys.exit(1)
+    base_dir = os.path.dirname(os.path.abspath(save_config_path))
 
-        results_filename = os.path.join(save_config_path, save_name + "_results.json")
-        
+    if not os.path.isdir(base_dir) or not os.access(base_dir, os.W_OK):
+        print(f"Filepath '{save_config_path}' invalid (not accessible)")
+        sys.exit(1)
+
+    results_filename = os.path.join(save_config_path, save_name + "_results.json")
+
+    if os.path.exists(results_filename):
+        print(f"The file {results_filename} already exists.")
+        return None
+
     
-        if os.path.exists(results_filename):
-            print(f"The file {results_filename} already exists.")
-            return None
-
-        
-        return results_filename
+    return results_filename
     
 
 
@@ -254,6 +251,7 @@ try:
 
 except Exception as e:
     print(f"Error during preparation of IDQ: {e}")
+    sys.exit(1)
 
 
 ############################# Preparation of Montana ###############################
@@ -262,8 +260,7 @@ try:
 
 except Exception as e:
     print(f"Error during preparation of Montana: {e}")
-
-
+    sys.exit(1)
 
 
 
@@ -369,8 +366,19 @@ print("Tutto pronto. Premi invio...")
 ignore = builtins.input()
 
 
+
 scan_started = True
 start_time = time.time()
+
+## Recording Velocity of Axes in Parameters for the future.
+
+scan_set.step_velocity = positioner.velocity
+print(f"Detected axis veocities: {scan_set.step_velocity}")
+placeholder = scan_set.step_velocity[scan_set.axis_list[0]]
+for value in scan_set.step_velocity.values():
+    if value != placeholder:
+        print("Some axis velocities aren't matching. Enter to move forward.")
+        builtins.input()
 
 ## ZEROING ALL POSITIONER AXES 
 for axis in scan_set.axis_list():
@@ -388,9 +396,11 @@ for axis in scan_set.axis_list():
 
 index_vector = {axis: 0 for axis in scan_set.axis_list()}
 
+iteration_counter = 0
 ################################################### MAIN LOOP LOGIC ####################################################
 while True:
-    
+    iteration_start_time = time.time()  
+
     print(f"Current Position Index: {index_vector}")
 
     # Measurement stage:
@@ -417,7 +427,15 @@ while True:
         
         scan_motion(instruction, scan_set, positioner)
 
+    if iteration_counter > 0:
+        elapsed_time = time.time() - iteration_start_time
+        avg_iteration_time = elapsed_time / iteration_counter
+        eta = avg_iteration_time * (scan_sequencer.end_product - iteration_counter)
+        print(f"Estimated ETA: {round(eta, 3)} s")
+    
     time.sleep(scan_set.sleep_time)   # Another optional sleep margin, although not necessary.
+
+
 
 
 end_time=time.time()
