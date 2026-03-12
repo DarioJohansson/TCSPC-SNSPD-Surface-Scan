@@ -60,7 +60,8 @@ class StepSequencer():
 
         self.end_product = 1
         for value in self.resolution.values():
-            self.end_product *= (value)
+            if value != 0:
+                self.end_product *= (value)
     
     def next_step_in_sequence(self) -> tuple[dict, list[dict]]|None:
         
