@@ -193,11 +193,15 @@ def interactive_prompt() -> ScanParameters:
         while True:
             # Scan type
             type_input = input(f"Enter scan motion type (available: {AVAILABLE_SCAN_TYPES}) (current: {parameters.scan_type}): ")
-            if type_input in AVAILABLE_SCAN_TYPES:
-                parameters.scan_type = type_input
-                break
+            if type_input.strip():
+                if type_input in AVAILABLE_SCAN_TYPES:    
+                    parameters.scan_type = type_input
+                    break
+                else:
+                    print("Entered invalid type. Try again.")
             else:
-                print("Entered invalid type. Try again.")
+                print(f"defaulting to {parameters.scan_type}")
+                break
             
 
         while True:
@@ -211,6 +215,7 @@ def interactive_prompt() -> ScanParameters:
                     print("Value incompatible. Retry.")
             else:
                 print(f"defaulting to {parameters.counter_integration_time}")
+                break
 
         while True:   
             # Tolerances
@@ -223,6 +228,7 @@ def interactive_prompt() -> ScanParameters:
                     print("Value incompatible. Retry.")
             else:
                 print(f"defaulting to {parameters.tol_acquisition_time}")
+                break
 
 
         if parameters.tol_acquisition_time > 0:
@@ -237,6 +243,7 @@ def interactive_prompt() -> ScanParameters:
                         print("Value incompatible. Retry.")
                 else:
                     print(f"defaulting to {parameters.tol_bcount}")
+                    break
 
             while True:
                 bwidth_input = input(f"Enter TRPL bin width in ps (current: {parameters.tol_bwidth}): ")
@@ -248,6 +255,7 @@ def interactive_prompt() -> ScanParameters:
                         print("Value incompatible. Retry.")
                 else:
                     print(f"defaulting to {parameters.tol_bwidth}")
+                    break
 
             while True:
                 delay_input = input(f"Enter TRPL bin delay in ps (current: {parameters.tol_delay}): ")
@@ -259,6 +267,7 @@ def interactive_prompt() -> ScanParameters:
                         print("Value incompatible. Retry.")
                 else:
                     print(f"defaulting to {parameters.tol_delay}")
+                    break
 
         # Sleep time
         sleep_input = input(f"Enter additional sleep time for each step in seconds (current: {parameters.sleep_time}): ")
