@@ -1,7 +1,7 @@
 # Local dependencies
 from devices.idq_tc1000_device import TimeController
 from devices.montana_cryoadvance_controls import Positioner
-from scans.scan_data_structures import ScanParameters, ScanResults, TCCounter, TCToL
+from scans.scan_data_structures import ScanParameters, ScanResults, TCCounter, TCToL, AVAILABLE_SCAN_TYPES
 from components.service_config.argparser import build_arg_parser
 from components.service_config.service_config import ServiceConfig
 
@@ -17,7 +17,7 @@ from datetime import datetime
 now = datetime.now() # current date and time
 
 
-
+SCAN_VERSION = 0.21
 DEFAULT_IDQ_IP="169.254.207.101"
 DEFAULT_MONTANA_IP="192.168.1.2"
 results_filepath = None
@@ -182,37 +182,83 @@ def interactive_prompt() -> ScanParameters:
             if res_input.strip():
                 parameters.resolution[axis] = int(res_input)
 
-        print(f"DEBUG: axes: {parameters.resolution}")
 
         # Step size for each axis
         for axis in parameters.axis_list():
             current_step = parameters.step_size.get(axis, 0.0)
-            step_input = input(f"Enter step size for axis {axis} in metres (current: {current_step}): ")
+            step_input = input(f"Enter step size for axis {axis} in metres (current: {current_step})\n(use scientific notation if needed: '10e-5' equals 10 microns): ")
             if step_input.strip():
                 parameters.step_size[axis] = float(step_input)
 
-        # Counter integration time
-        cit_input = input(f"Enter counter integration time in ms (current: {parameters.counter_integration_time}): ")
-        if cit_input.strip():
-            parameters.counter_integration_time = int(cit_input)
+        while True:
+            # Scan type
+            type_input = input(f"Enter scan motion type (available: {AVAILABLE_SCAN_TYPES}) (current: {parameters.scan_type}): ")
+            if type_input in AVAILABLE_SCAN_TYPES:
+                parameters.scan_type = type_input
+                break
+            else:
+                print("Entered invalid type. Try again.")
+            
 
-        # Tolerances
-        acq_time_input = input(f"Enter TRPL acquisition time in seconds  (set to 0 to disable TRPL) (current: {parameters.tol_acquisition_time}): ")
-        if acq_time_input.strip():
-            parameters.tol_acquisition_time = int(acq_time_input)
+        while True:
+            # Counter integration time
+            cit_input = input(f"Enter counter integration time in ms (current: {parameters.counter_integration_time}): ")
+            if cit_input.strip():
+                try:
+                    parameters.counter_integration_time = int(cit_input)
+                    break
+                except:
+                    print("Value incompatible. Retry.")
+            else:
+                print(f"defaulting to {parameters.counter_integration_time}")
+
+        while True:   
+            # Tolerances
+            acq_time_input = input(f"Enter TRPL acquisition time in seconds  (set to 0 to disable TRPL) (current: {parameters.tol_acquisition_time}): ")
+            if acq_time_input.strip():
+                try:
+                    parameters.tol_acquisition_time = int(acq_time_input)
+                    break
+                except:
+                    print("Value incompatible. Retry.")
+            else:
+                print(f"defaulting to {parameters.tol_acquisition_time}")
+
 
         if parameters.tol_acquisition_time > 0:
-            bcount_input = input(f"Enter TRPL bin count (current: {parameters.tol_bcount}): ")
-            if bcount_input.strip():
-                parameters.tol_bcount = int(bcount_input)
+            
+            while True:
+                bcount_input = input(f"Enter TRPL bin count (current: {parameters.tol_bcount}): ")
+                if bcount_input.strip():
+                    try:
+                        parameters.tol_bcount = int(bcount_input)
+                        break
+                    except:
+                        print("Value incompatible. Retry.")
+                else:
+                    print(f"defaulting to {parameters.tol_bcount}")
 
-            bwidth_input = input(f"Enter TRPL bin width in ps (current: {parameters.tol_bwidth}): ")
-            if bwidth_input.strip():
-                parameters.tol_bwidth = int(bwidth_input)
+            while True:
+                bwidth_input = input(f"Enter TRPL bin width in ps (current: {parameters.tol_bwidth}): ")
+                if bwidth_input.strip():
+                    try:
+                        parameters.tol_bwidth = int(bwidth_input)
+                        break
+                    except:
+                        print("Value incompatible. Retry.")
+                else:
+                    print(f"defaulting to {parameters.tol_bwidth}")
 
-            delay_input = input(f"Enter TRPL bin delay in ps (current: {parameters.tol_delay}): ")
-            if delay_input.strip():
-                parameters.tol_delay = int(delay_input)
+            while True:
+                delay_input = input(f"Enter TRPL bin delay in ps (current: {parameters.tol_delay}): ")
+                if delay_input.strip():
+                    try: 
+                        parameters.tol_delay = int(delay_input)
+                        break
+                    except:
+                        print("Value incompatible. Retry.")
+                else:
+                    print(f"defaulting to {parameters.tol_delay}")
 
         # Sleep time
         sleep_input = input(f"Enter additional sleep time for each step in seconds (current: {parameters.sleep_time}): ")
@@ -310,7 +356,8 @@ if args.config_from_file is not None:
         path = select_file()
     
     scan_set = ScanParameters.from_json(path=path)
-    
+    if scan_set.software_version != SCAN_VERSION:
+        print(f"#######\nNote: the config file used is for a different version of the scan software:\nScan Version: {SCAN_VERSION}\nParameters Version: {scan_set.software_version}\n#######")
 
 
 elif args.save_config is not None:
@@ -320,6 +367,7 @@ elif args.save_config is not None:
         try:
 
             scan_set : ScanParameters = interactive_prompt()
+            scan_set.software_version = SCAN_VERSION
             path = args.save_config
             parent = os.path.dirname(path)
             if os.access(parent, os.W_OK | os.X_OK) and os.path.isdir(parent):
@@ -344,6 +392,7 @@ elif args.save_config is not None:
         
         try:
             scan_set : ScanParameters = interactive_prompt()
+            scan_set.software_version = SCAN_VERSION
             parent = os.path.dirname(filepath)
             if os.access(parent, os.W_OK | os.X_OK) and os.path.isdir(parent):
                 print("Saving config to following path:")
@@ -361,7 +410,8 @@ elif args.save_config is not None:
         
 else:
     
-    scan_set: ScanParameters = interactive_prompt()        
+    scan_set: ScanParameters = interactive_prompt()
+    scan_set.software_version = SCAN_VERSION        
 
 
 ## Defining save path for results:

@@ -10,6 +10,8 @@ from devices.idq_tc1000_tol import *
 from components.service_config.service_config import ServiceConfig, ConfigurationError
 from scans.scan_patterns import raster_sequence, snake_sequence
 
+AVAILABLE_SCAN_TYPES=["raster", "snake"]
+
 class StepSequencer():
     def __init__(self,
         resolution=None,
@@ -109,8 +111,10 @@ class ScanParameters(ServiceConfig):
     montana_cryoadvance_ip: str = None
 
     # defaults
+    software_version: float = None
     resolution: dict = field(default_factory=lambda: {"X": 0, "Y": 0, "Z": 0})
     step_size: dict = field(default_factory=lambda: {"X": 0, "Y": 0, "Z": 0})
+    scan_type : str = "raster"
     input_thresholds: dict = field(default_factory=lambda: {
         "start": -0.3,
         "1": -0.1,
@@ -132,7 +136,7 @@ class ScanParameters(ServiceConfig):
 
 
     def initialize_step_sequencer(self):
-        return StepSequencer(self.resolution, self.step_size)
+        return StepSequencer(self.resolution, self.step_size, self.scan_type)
     
     def initialize_results(self):
         return ScanResults(self.resolution)
