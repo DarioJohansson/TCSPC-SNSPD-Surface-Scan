@@ -24,11 +24,13 @@ class StepSequencer():
         self.scan_type = type
         self.resolution = resolution
         self.step_size = step_size
-        self.step_matrix = {}
-        self.step_counter = {}
-        self.active_axes = ()
-        self.direction = {}
-        self.position = {}
+        self.step_matrix = {}       # Map matrix transforming index positions space to physical dimension space.
+        self.step_counter = {}      # Integer vector with index positions of axis steps
+        self.active_axes = ()       # Tuple of active axes
+        self.direction = {}         # Direction unit vector
+        self.position = {}          # Physical posititon coordinate vector for the axes
+        self.counter = 0            # Magnitude of executed steps
+        self.end_product = 1        # Variable which stores the product of necessary steps to compare with counter.
         self._initialize_step_matrix()
 
     
@@ -56,7 +58,9 @@ class StepSequencer():
             for i in range(0, self.resolution[axis]):
                 self.step_matrix[axis].append(round(i * self.step_size[axis], 9))           # Result of this will be a step matrix like so: {"Y": [steps], "Z": [steps]} if X resolution was left 0.
 
-    
+        self.end_product = 1
+        for value in self.resolution.values():
+            self.end_product *= (value)
     
     def next_step_in_sequence(self) -> tuple[dict, list[dict]]|None:
         
@@ -72,14 +76,16 @@ class StepSequencer():
                      
         
         ######## Initial calculation condition
-
-        if self.step_counter != {axis: self.resolution[axis] - 1 for axis in self.active_axes}:     ## checks if the current position dict is dissimilar from the final position dict, where all axes are at res - 1 in position
+        
+        
+        if self.counter < self.end_product - 1 :     ## checks if the current position dict is dissimilar from the final position dict, where all axes are at res - 1 in position
             
             if self.scan_type == "raster":
                 raster_sequence(self.step_counter, self.resolution)
             elif self.scan_type == "snake":
                 snake_sequence(self.step_counter, self.resolution, self.direction)
             
+            self.counter+=1
 
             # Index conversion to real measurements. 
             new_position_vector = {axis: round(self.step_counter[axis] * self.step_size[axis], 9) for axis in self.active_axes}
