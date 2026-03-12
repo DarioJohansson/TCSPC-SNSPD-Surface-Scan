@@ -374,7 +374,7 @@ start_time = time.time()
 
 scan_set.step_velocity = positioner.velocity
 print(f"Detected axis veocities: {scan_set.step_velocity}")
-placeholder = scan_set.step_velocity[scan_set.axis_list[0]]
+placeholder = scan_set.step_velocity[scan_set.axis_list()[0]]
 for value in scan_set.step_velocity.values():
     if value != placeholder:
         print("Some axis velocities aren't matching. Enter to move forward.")
@@ -396,19 +396,20 @@ for axis in scan_set.axis_list():
 
 index_vector = {axis: 0 for axis in scan_set.axis_list()}
 
-iteration_counter = 0
+iteration_time_list = []
 ################################################### MAIN LOOP LOGIC ####################################################
 while True:
     iteration_start_time = time.time()  
 
-    print(f"Current Position Index: {index_vector}")
+    print(f"------------ Step Number: {len(iteration_time_list)} ------------\n")
+    print(f" [Data]  Current Position Index: {index_vector}")
 
     # Measurement stage:
     if scan_set.counter_integration_time > 0:
-        print("Measuring photon incidence freq:")
+        print(" [Operation] Measuring photon incidence freq:")
         measure_frequency(index_vector, scan_res, input1_counter)
     if scan_set.tol_acquisition_time > 0:
-        print(f"Measuring photon ToL for {scan_set.tol_acquisition_time} seconds:")
+        print(f" [Operation] Measuring photon ToL for {scan_set.tol_acquisition_time} seconds:")
         measure_tol(index_vector, scan_res, scan_set.tol_acquisition_time, input1_tol)
     
     next = scan_sequencer.next_step_in_sequence()
@@ -423,16 +424,18 @@ while True:
     # internal records.
 
     for instruction in motion_instructions:
-        print(f"Moving Positioner to: {instruction}")
+        print(f" [Operation] Moving Positioner to: {instruction}\n")
         
         scan_motion(instruction, scan_set, positioner)
 
-    if iteration_counter > 0:
+    if len(iteration_time_list) > 0:
         elapsed_time = time.time() - iteration_start_time
-        avg_iteration_time = elapsed_time / iteration_counter
-        eta = avg_iteration_time * (scan_sequencer.end_product - iteration_counter)
-        print(f"Estimated ETA: {round(eta, 3)} s")
+        avg_iteration_time = sum(iteration_time_list) / len(iteration_time_list)
+        eta = avg_iteration_time * (scan_sequencer.end_product - len(iteration_time_list))
+        print(f" [Time] Estimated ETA: {round(eta, 3)} s\n\n")
     
+    elapsed_time = time.time() - iteration_start_time
+    iteration_time_list.append(elapsed_time)
     time.sleep(scan_set.sleep_time)   # Another optional sleep margin, although not necessary.
 
 
