@@ -1,13 +1,24 @@
-DEFAULT_IDQ_IP="169.254.207.101"
-DEFAULT_MONTANA_IP="192.168.1.2"
+
 from scans.scan_data_structures import ScanParameters, AVAILABLE_SCAN_TYPES
+from scans.values import DEFAULT_IDQ_IP, DEFAULT_MONTANA_IP, SOFTWARE_VERSION
+
+
+def print_banner():
+    print(f"------------------ Welcome to the AutoPL Mapping Software - Version {SOFTWARE_VERSION} ----------------")
+    print("Made By:     Dario Johansson - Scienze dei Materiali - Via Roberto Cozzi, 55 - 20126 Milano")
+    print("Email:       dario.johansson@outlook.com\nGitHub:      https://github.com/DarioJohansson/TCSPC-SNSPD-Surface-Scan\n\n\n")
+
 
 
 def interactive_prompt() -> ScanParameters:
     interactive_prompt = True
     parameters = ScanParameters()
     
+    print_banner()
+
     while interactive_prompt:
+
+        print("\n - DEVICE IPs:\n")
 
         # Device IP Addresses:
         idq_ip_input = input(f"Input the IP address of the IDQ Time Tagger device or press Enter to keep {DEFAULT_IDQ_IP}: ")
@@ -23,6 +34,10 @@ def interactive_prompt() -> ScanParameters:
         else:
             parameters.montana_cryoadvance_ip = DEFAULT_MONTANA_IP
 
+        
+        print("\n\n - MONTANA SETTINGS:")
+        print("\n1) Axis Settings:\n")
+
         # Resolution for each axis              
         for axis in ["X", "Y", "Z"]:
             res_input = input(f"Enter resolution (number of steps) for axis {axis}. Set to 0 to disable axis:  ")
@@ -37,6 +52,8 @@ def interactive_prompt() -> ScanParameters:
             if step_input.strip():
                 parameters.step_size[axis] = float(step_input)
 
+        print("\n2) Scan Motion Algorithm Selection:\n")
+        
         while True:
             # Scan type
             type_input = input(f"Enter scan motion type (available: {AVAILABLE_SCAN_TYPES}) (current: {parameters.scan_type}): ")
@@ -50,6 +67,9 @@ def interactive_prompt() -> ScanParameters:
                 print(f"defaulting to {parameters.scan_type}")
                 break
             
+        print("\n\n - IDQ (Time Tagger) DETECTOR SETTINGS:")
+        print("\n1) Time Tagger Counter Settings:\n")
+
 
         while True:
             # Counter integration time
@@ -64,8 +84,10 @@ def interactive_prompt() -> ScanParameters:
                 print(f"defaulting to {parameters.counter_integration_time}")
                 break
 
+        print("\n2) Time Tagger TRPL Settings:\n")
+        
         while True:   
-            # Tolerances
+            # TRPL Settings
             acq_time_input = input(f"Enter TRPL acquisition time in seconds  (set to 0 to disable TRPL) (current: {parameters.tol_acquisition_time}): ")
             if acq_time_input.strip():
                 try:
@@ -104,6 +126,7 @@ def interactive_prompt() -> ScanParameters:
                     print(f"defaulting to {parameters.tol_bwidth}")
                     break
 
+            
             while True:
                 delay_input = input(f"Enter TRPL bin delay in ps (current: {parameters.tol_delay}): ")
                 if delay_input.strip():
@@ -116,6 +139,8 @@ def interactive_prompt() -> ScanParameters:
                     print(f"defaulting to {parameters.tol_delay}")
                     break
 
+        print("\n3) Additional Device Stabilization Delay:\n")
+
         # Sleep time
         sleep_input = input(f"Enter additional sleep time for each step in seconds (current: {parameters.sleep_time}): ")
         if sleep_input.strip():
@@ -125,6 +150,8 @@ def interactive_prompt() -> ScanParameters:
         # Input list. Defines which input is active in the receptikon of photons from the samples. START trigger channel is on by default with a threshold of -0.3.
         # The user can select the remaining input channel or leave default at "1"
 
+        print("\n4) Low Level Parameters for Detection (leave unchanged if unsure):\n")
+        
         tagger_input = input(f"Enter the input channel number (default: 1): ")
         
         if tagger_input.strip():
@@ -160,6 +187,7 @@ def interactive_prompt() -> ScanParameters:
         print(f"  Active Axes: {parameters.axis_list()}")
         print(f"  Step size {axis}: {parameters.step_size} m")
         print(f"  Resolution {axis}: {parameters.resolution}")
+        print(f"  Scan Algorithm: {parameters.scan_type}")
         print(f"  Counter integration time: {parameters.counter_integration_time} ms")
         print(f"  TRPL Acquisition time (s): {parameters.tol_acquisition_time}")
         print(f"  TRPL Bin count: {parameters.tol_bcount}")
