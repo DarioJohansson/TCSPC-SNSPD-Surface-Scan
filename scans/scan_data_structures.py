@@ -9,8 +9,8 @@ from devices.idq_tc1000_counter import *
 from devices.idq_tc1000_tol import *
 from components.service_config.service_config import ServiceConfig, ConfigurationError
 from scans.scan_patterns import raster_sequence, snake_sequence
+from scans.values import AVAILABLE_SCAN_TYPES
 
-AVAILABLE_SCAN_TYPES=["raster", "snake"]
 
 class StepSequencer():
     def __init__(self,

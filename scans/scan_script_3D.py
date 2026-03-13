@@ -1,8 +1,9 @@
 # Local dependencies
 from devices.idq_tc1000_device import TimeController
 from devices.montana_cryoadvance_controls import Positioner
-from scans.scan_data_structures import ScanParameters, ScanResults, TCCounter, TCToL, AVAILABLE_SCAN_TYPES
+from scans.scan_data_structures import ScanParameters, ScanResults, TCCounter, TCToL
 from scans.interactive_prompt import interactive_prompt
+from scans.values import SOFTWARE_VERSION, ALLOWED_FILETYPES
 from components.service_config.argparser import build_arg_parser
 from components.service_config.service_config import ServiceConfig
 
@@ -18,13 +19,9 @@ from datetime import datetime
 now = datetime.now() # current date and time
 
 
-SCAN_VERSION = 0.21
-DEFAULT_IDQ_IP="169.254.207.101"
-DEFAULT_MONTANA_IP="192.168.1.2"
-results_filepath = None
-parameters_filepath = None
 
-allowed_filetype_extensions = [("JSON", "*.json")]
+results_filepath = None
+
 
 ## some util functions for the scan routine.
 
@@ -81,7 +78,7 @@ def select_file(msg: str = "Select a file") -> str:
     try:
         file_path = filedialog.askopenfilename(
             title=msg,
-            filetypes=allowed_filetype_extensions
+            filetypes=ALLOWED_FILETYPES
         )
 
         if file_path:
@@ -106,7 +103,7 @@ def new_file(msg: str = "Choose new file", filename=None) -> str:
         file_path = filedialog.asksaveasfilename(
             title=msg,
             initialfile=filename,
-            filetypes=allowed_filetype_extensions,
+            filetypes=ALLOWED_FILETYPES,
             defaultextension=".json"
         )
 
@@ -177,8 +174,8 @@ if args.config_from_file is not None:
         path = select_file()
     
     scan_set = ScanParameters.from_json(path=path)
-    if scan_set.software_version != SCAN_VERSION:
-        print(f"#######\nNote: the config file used is for a different version of the scan software:\nScan Version: {SCAN_VERSION}\nParameters Version: {scan_set.software_version}\n#######")
+    if scan_set.software_version != SOFTWARE_VERSION:
+        print(f"#######\nNote: the config file used is for a different version of the scan software:\nScan Version: {SOFTWARE_VERSION}\nParameters Version: {scan_set.software_version}\n#######")
 
 
 elif args.save_config is not None:
@@ -188,7 +185,7 @@ elif args.save_config is not None:
         try:
 
             scan_set : ScanParameters = interactive_prompt()
-            scan_set.software_version = SCAN_VERSION
+            scan_set.software_version = SOFTWARE_VERSION
             path = args.save_config
             parent = os.path.dirname(path)
             if os.access(parent, os.W_OK | os.X_OK) and os.path.isdir(parent):
@@ -213,7 +210,7 @@ elif args.save_config is not None:
         
         try:
             scan_set : ScanParameters = interactive_prompt()
-            scan_set.software_version = SCAN_VERSION
+            scan_set.software_version = SOFTWARE_VERSION
             parent = os.path.dirname(filepath)
             if os.access(parent, os.W_OK | os.X_OK) and os.path.isdir(parent):
                 print("Saving config to following path:")
@@ -232,7 +229,7 @@ elif args.save_config is not None:
 else:
     
     scan_set: ScanParameters = interactive_prompt()
-    scan_set.software_version = SCAN_VERSION        
+    scan_set.software_version = SOFTWARE_VERSION        
 
 
 ## Defining save path for results:
@@ -447,9 +444,8 @@ print(f"Time Elapsed for Scan: {end_time-start_time} S")
 
 
 scan_res.save(results_filepath)
-scan_set.to_json(parameters_filepath)
 
 print("Premi invio per uscire...")
 builtins.input()
-exit()
+sys.exit(0)
 
